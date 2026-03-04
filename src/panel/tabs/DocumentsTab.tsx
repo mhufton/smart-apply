@@ -51,7 +51,7 @@ export default function DocumentsTab({ docs, job, onDocsChange, onOpenChat }: Pr
           fieldMap[field.selector] = docs.cv.split('\n\n')[0] ?? ''
         }
       }
-      window.parent.postMessage({ type: 'SA_INJECT_REQUEST', payload: fieldMap }, '*')
+      await chrome.runtime.sendMessage({ type: 'INJECT_FIELDS', payload: fieldMap })
     } finally {
       setInjecting(false)
     }

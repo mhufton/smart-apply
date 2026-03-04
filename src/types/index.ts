@@ -96,11 +96,8 @@ export interface GeneratedDocuments {
 // ── Messaging ─────────────────────────────────────────────────────────────────
 
 export type ExtMessage =
-  | { type: 'TOGGLE_PANEL' }
-  | { type: 'SCRAPE_JOB'; payload: ScrapedJob }
+  | { type: 'SCRAPE_JOB' }
   | { type: 'INJECT_FIELDS'; payload: Record<string, string> }
-  | { type: 'GET_PANEL_STATE' }
-  | { type: 'PANEL_STATE'; payload: { open: boolean } }
 
 // ── Chat ──────────────────────────────────────────────────────────────────────
 

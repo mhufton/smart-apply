@@ -297,16 +297,7 @@ function fieldTypeColor(type: string) {
 // ── Content script bridge ─────────────────────────────────────────────────────
 
 function scrapeCurrentPage(): Promise<ScrapedJob> {
-  return new Promise((resolve) => {
-    const handler = (event: MessageEvent) => {
-      if (event.data?.type === 'SA_SCRAPE_RESULT') {
-        window.removeEventListener('message', handler)
-        resolve(event.data.payload)
-      }
-    }
-    window.addEventListener('message', handler)
-    window.parent.postMessage({ type: 'SA_SCRAPE_REQUEST' }, '*')
-  })
+  return chrome.runtime.sendMessage({ type: 'SCRAPE_JOB' })
 }
 
 // ── Response parsers ──────────────────────────────────────────────────────────

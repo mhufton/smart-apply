@@ -19,10 +19,6 @@ export default function App() {
   const [docs, setDocs] = useState<GeneratedDocuments | null>(null)
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
 
-  function handleClose() {
-    window.parent.postMessage({ type: 'SA_CLOSE_PANEL' }, '*')
-  }
-
   return (
     <div className="flex flex-col h-full bg-[#0f1117] text-slate-200">
       {/* Header */}
@@ -35,13 +31,6 @@ export default function App() {
             </span>
           )}
         </div>
-        <button
-          onClick={handleClose}
-          className="text-slate-500 hover:text-slate-300 transition-colors text-lg leading-none w-6 h-6 flex items-center justify-center"
-          aria-label="Close panel"
-        >
-          ×
-        </button>
       </header>
 
       {/* Fit score banner — shown once analysis is available */}

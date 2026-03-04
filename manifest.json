@@ -6,7 +6,7 @@
   "permissions": [
     "activeTab",
     "storage",
-    "scripting"
+    "sidePanel"
   ],
   "host_permissions": [
     "http://localhost:*/*",
@@ -36,10 +36,7 @@
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
-  "web_accessible_resources": [
-    {
-      "resources": ["panel.html", "assets/*"],
-      "matches": ["<all_urls>"]
-    }
-  ]
+  "side_panel": {
+    "default_path": "panel.html"
+  }
 }

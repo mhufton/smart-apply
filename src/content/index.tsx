@@ -1,75 +1,6 @@
 import type { ExtMessage, ScrapedJob, FormField } from '../types'
 
-const PANEL_ID = 'smart-apply-panel-root'
-const PANEL_WIDTH = 'min(33vw, 680px)'
-const EASE = '0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-
 console.log('[Smart Apply] content script loaded')
-
-// ── Panel DOM ─────────────────────────────────────────────────────────────────
-
-function createPanel(): HTMLDivElement {
-  const container = document.createElement('div')
-  container.id = PANEL_ID
-
-  Object.assign(container.style, {
-    position: 'fixed',
-    top: '0',
-    right: '0',
-    width: PANEL_WIDTH,
-    height: '100vh',
-    zIndex: '2147483647',   // max z-index
-    transform: 'translateX(100%)',
-    transition: `transform ${EASE}`,
-    boxShadow: '-8px 0 32px rgba(0,0,0,0.4)',
-    border: 'none',
-    overflow: 'hidden',
-  })
-
-  const iframe = document.createElement('iframe')
-  iframe.src = chrome.runtime.getURL('panel.html')
-  Object.assign(iframe.style, {
-    width: '100%',
-    height: '100%',
-    border: 'none',
-    display: 'block',
-  })
-
-  container.appendChild(iframe)
-  return container
-}
-
-let panelEl: HTMLDivElement | null = null
-let isOpen = false
-
-function getOrCreatePanel(): HTMLDivElement {
-  if (!panelEl) {
-    panelEl = createPanel()
-    document.body.appendChild(panelEl)
-  }
-  return panelEl
-}
-
-function openPanel() {
-  const panel = getOrCreatePanel()
-  panel.style.transform = 'translateX(0)'
-  isOpen = true
-  // Push page content left so it doesn't hide under the panel
-  document.body.style.transition = `margin-right ${EASE}`
-  document.body.style.marginRight = PANEL_WIDTH
-}
-
-function closePanel() {
-  if (!panelEl) return
-  panelEl.style.transform = 'translateX(100%)'
-  isOpen = false
-  document.body.style.marginRight = '0'
-}
-
-function togglePanel() {
-  console.log('[Smart Apply] togglePanel, isOpen=', isOpen)
-  isOpen ? closePanel() : openPanel()
-}
 
 // ── Job Scraping ──────────────────────────────────────────────────────────────
 
@@ -135,7 +66,6 @@ function scrapeFormFields(): FormField[] {
 }
 
 function scrapeJobDescription(): Pick<ScrapedJob, 'title' | 'company' | 'location' | 'description'> {
-  // Generic heuristics — platform-specific logic can be added later
   const titleEl = document.querySelector<HTMLElement>(
     'h1, [class*="job-title"], [class*="jobTitle"], [data-automation-id="jobPostingHeader"]'
   )
@@ -189,32 +119,16 @@ function injectFields(values: Record<string, string>) {
 
 // ── Message Listener ──────────────────────────────────────────────────────────
 
-chrome.runtime.onMessage.addListener((message: ExtMessage) => {
-  if (message.type === 'TOGGLE_PANEL') {
-    togglePanel()
-    return
+chrome.runtime.onMessage.addListener((message: ExtMessage, _sender, sendResponse) => {
+  if (message.type === 'SCRAPE_JOB') {
+    const job = scrapeJob()
+    sendResponse(job)
+    return false
   }
   if (message.type === 'INJECT_FIELDS') {
     injectFields(message.payload)
-    return
+    sendResponse({ ok: true })
+    return false
   }
-})
-
-// The panel iframe posts messages to the parent (content script) for scraping
-// because the iframe itself cannot access the host page DOM.
-window.addEventListener('message', (event) => {
-  if (event.source !== panelEl?.querySelector('iframe')?.contentWindow) return
-
-  if (event.data?.type === 'SA_SCRAPE_REQUEST') {
-    const job = scrapeJob()
-    event.source?.postMessage({ type: 'SA_SCRAPE_RESULT', payload: job }, '*' as any)
-  }
-
-  if (event.data?.type === 'SA_INJECT_REQUEST') {
-    injectFields(event.data.payload)
-  }
-
-  if (event.data?.type === 'SA_CLOSE_PANEL') {
-    closePanel()
-  }
+  return false
 })
