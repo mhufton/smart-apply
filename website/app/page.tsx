@@ -57,6 +57,7 @@ export default function Home() {
           <div className="flex items-center gap-6 text-xs text-slate-400">
             <Link href="/privacy" className="hover:text-slate-200 transition-colors">Privacy</Link>
             <Link href="/terms" className="hover:text-slate-200 transition-colors">Terms</Link>
+            <Link href="/contact" className="hover:text-slate-200 transition-colors">Contact</Link>
             <a href="https://github.com/mhufton/smart-apply" target="_blank" rel="noopener noreferrer" className="hover:text-slate-200 transition-colors">GitHub</a>
           </div>
         </div>
@@ -167,6 +168,7 @@ export default function Home() {
           <div className="flex items-center gap-6 text-xs text-slate-500">
             <Link href="/privacy" className="hover:text-slate-300 transition-colors">Privacy Policy</Link>
             <Link href="/terms" className="hover:text-slate-300 transition-colors">Terms of Service</Link>
+            <Link href="/contact" className="hover:text-slate-300 transition-colors">Contact</Link>
             <a href="https://github.com/mhufton/smart-apply" target="_blank" rel="noopener noreferrer" className="hover:text-slate-300 transition-colors">GitHub</a>
           </div>
         </div>
