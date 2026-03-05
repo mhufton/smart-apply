@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import type { MasterProfile, Experience, Education } from '../../types'
 import { loadProfile, saveProfile } from '../lib/storage'
-import { callClaude, buildResumeParsePrompt } from '../lib/claude'
+import { callHaiku, buildResumeParsePrompt } from '../lib/claude'
 
 export default function ProfileTab() {
   const [profile, setProfile] = useState<MasterProfile | null>(null)
@@ -78,7 +78,7 @@ export default function ProfileTab() {
     try {
       const prompt = buildResumeParsePrompt(resumeText)
       let raw = ''
-      await callClaude([{ role: 'user', content: prompt }], (chunk) => { raw += chunk })
+      await callHaiku([{ role: 'user', content: prompt }], (chunk) => { raw += chunk })
       const jsonMatch = raw.match(/```json\s*([\s\S]+?)\s*```/) ?? raw.match(/(\{[\s\S]+\})/)
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[1]) as Partial<MasterProfile>

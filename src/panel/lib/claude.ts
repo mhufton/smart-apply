@@ -1,52 +1,46 @@
 import type { MasterProfile, ScrapedJob } from '../../types'
 
-// ── Config ────────────────────────────────────────────────────────────────────
+// ── API key ───────────────────────────────────────────────────────────────────
 
-interface ClaudeConfig {
-  endpoint: string    // local Ollama or Anthropic API
-  model: string
-  apiKey?: string
+export async function getApiKey(): Promise<string | null> {
+  const result = await chrome.storage.local.get('anthropicApiKey')
+  return result.anthropicApiKey ?? null
 }
 
-async function getConfig(): Promise<ClaudeConfig> {
-  const result = await chrome.storage.local.get('claudeConfig')
-  return result.claudeConfig ?? {
-    endpoint: 'http://localhost:11434/v1/chat/completions',  // Ollama OpenAI-compat endpoint
-    model: 'llama3.2',
-  }
+export async function saveApiKey(key: string): Promise<void> {
+  await chrome.storage.local.set({ anthropicApiKey: key })
+}
+
+export async function clearApiKey(): Promise<void> {
+  await chrome.storage.local.remove('anthropicApiKey')
 }
 
 // ── Core streaming call ───────────────────────────────────────────────────────
 
 export type ApiMessage = { role: 'user' | 'assistant'; content: string }
 
-export async function callClaude(
+async function streamAnthropic(
+  model: string,
   messages: ApiMessage[],
-  onChunk: (text: string) => void
+  onChunk: (text: string) => void,
+  maxTokens = 4096
 ): Promise<void> {
-  const config = await getConfig()
+  const apiKey = await getApiKey()
+  if (!apiKey) throw new Error('No Anthropic API key set. Add one in the Settings tab.')
 
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  }
-  if (config.apiKey) {
-    headers['Authorization'] = `Bearer ${config.apiKey}`
-    headers['anthropic-version'] = '2023-06-01'
-  }
-
-  const response = await fetch(config.endpoint, {
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
-    headers,
-    body: JSON.stringify({
-      model: config.model,
-      messages,
-      stream: true,
-      max_tokens: 4096,
-    }),
+    headers: {
+      'content-type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({ model, messages, stream: true, max_tokens: maxTokens }),
   })
 
   if (!response.ok) {
-    throw new Error(`Claude API error: ${response.status} ${response.statusText}`)
+    const body = await response.text()
+    throw new Error(`Anthropic API error ${response.status}: ${body}`)
   }
 
   const reader = response.body?.getReader()
@@ -65,23 +59,41 @@ export async function callClaude(
 
     for (const line of lines) {
       if (!line.startsWith('data: ')) continue
-      const data = line.slice(6)
-      if (data === '[DONE]') return
+      const data = line.slice(6).trim()
+      if (!data || data === '[DONE]') continue
 
       try {
         const json = JSON.parse(data)
-        // OpenAI-compat format (Ollama + Anthropic via proxy)
-        const delta = json.choices?.[0]?.delta?.content
-        // Native Anthropic streaming format
-        const anthropicDelta = json.type === 'content_block_delta' ? json.delta?.text : null
-        const text = delta ?? anthropicDelta
-        if (text) onChunk(text)
+        if (json.type === 'content_block_delta' && json.delta?.type === 'text_delta') {
+          onChunk(json.delta.text)
+        }
       } catch {
-        // Malformed SSE line — skip
+        // malformed SSE line — skip
       }
     }
   }
 }
+
+// ── Model callers ─────────────────────────────────────────────────────────────
+
+// Haiku — fast, cheap. Used for fit analysis, resume parsing, scraping tasks.
+export async function callHaiku(
+  messages: ApiMessage[],
+  onChunk: (text: string) => void
+): Promise<void> {
+  return streamAnthropic('claude-haiku-4-5-20251001', messages, onChunk, 4096)
+}
+
+// Sonnet — smarter. Used for CV + cover letter generation and chat.
+export async function callSonnet(
+  messages: ApiMessage[],
+  onChunk: (text: string) => void
+): Promise<void> {
+  return streamAnthropic('claude-sonnet-4-5', messages, onChunk, 8192)
+}
+
+// Legacy alias — points to Haiku.
+export const callClaude = callHaiku
 
 // ── Prompts ───────────────────────────────────────────────────────────────────
 
@@ -94,7 +106,7 @@ Summary: ${profile.summary}
 
 Experience:
 ${(profile.experiences ?? []).map(e =>
-  `- ${e.title} at ${e.company} (${e.dates})\n  Tags: ${(e.tags ?? []).join(', ')}\n  ${(e.bullets ?? []).slice(0,2).join(' | ')}`
+  `- ${e.title} at ${e.company} (${e.dates})\n  Tags: ${(e.tags ?? []).join(', ')}\n  ${(e.bullets ?? []).slice(0, 2).join(' | ')}`
 ).join('\n')}
 
 Skills: ${(profile.skills ?? []).join(', ')}

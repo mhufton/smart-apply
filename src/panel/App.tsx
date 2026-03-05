@@ -4,14 +4,16 @@ import JobTab from './tabs/JobTab'
 import ProfileTab from './tabs/ProfileTab'
 import DocumentsTab from './tabs/DocumentsTab'
 import ChatTab from './tabs/ChatTab'
+import SettingsTab from './tabs/SettingsTab'
 
-type Tab = 'job' | 'profile' | 'documents' | 'chat'
+type Tab = 'job' | 'profile' | 'documents' | 'chat' | 'settings'
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: 'job',       label: 'Job'       },
-  { id: 'profile',   label: 'Profile'   },
-  { id: 'documents', label: 'Documents' },
-  { id: 'chat',      label: 'Chat'      },
+  { id: 'job',       label: 'Job'      },
+  { id: 'profile',   label: 'Profile'  },
+  { id: 'documents', label: 'Docs'     },
+  { id: 'chat',      label: 'Chat'     },
+  { id: 'settings',  label: '⚙'        },
 ]
 
 export default function App() {
@@ -88,6 +90,9 @@ export default function App() {
             onMessagesChange={setChatMessages}
             onDocsUpdated={setDocs}
           />
+        )}
+        {activeTab === 'settings' && (
+          <SettingsTab />
         )}
       </main>
     </div>

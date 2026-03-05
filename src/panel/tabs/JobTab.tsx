@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { ScrapedJob, FitAnalysis, GeneratedDocuments } from '../../types'
-import { callClaude, buildFitPrompt, buildDocsPrompt } from '../lib/claude'
+import { callHaiku, callSonnet, buildFitPrompt, buildDocsPrompt } from '../lib/claude'
 import { loadProfile } from '../lib/storage'
 
 interface Props {
@@ -39,7 +39,7 @@ export default function JobTab({ job, fit, onJobScraped, onFitAnalyzed, onGenera
       const profile = await loadProfile()
       const prompt = buildFitPrompt(job, profile)
       let raw = ''
-      await callClaude([{ role: 'user', content: prompt }], (chunk) => { raw += chunk })
+      await callHaiku([{ role: 'user', content: prompt }], (chunk) => { raw += chunk })
       const fit = parseFitResponse(raw)
       onFitAnalyzed(fit)
     } finally {
@@ -59,7 +59,7 @@ export default function JobTab({ job, fit, onJobScraped, onFitAnalyzed, onGenera
 
       const prompt = buildDocsPrompt(job, profile, context)
       let raw = ''
-      await callClaude([{ role: 'user', content: prompt }], (chunk) => { raw += chunk })
+      await callSonnet([{ role: 'user', content: prompt }], (chunk) => { raw += chunk })
       const docs = parseDocsResponse(raw)
       onGenerateDocs(docs)
     } finally {
