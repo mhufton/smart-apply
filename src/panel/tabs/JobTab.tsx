@@ -15,6 +15,8 @@ interface Props {
   onGenerateDone: () => void
 }
 
+const SCRAPE_TIP_KEY = 'sa_scrape_tip_dismissed'
+
 export default function JobTab({ job, fit, onJobScraped, onFitAnalyzed, onGenerateDocs, onGenerateStart, onGenerateDone }: Props) {
   const [scraping, setScraping] = useState(false)
   const [analyzing, setAnalyzing] = useState(false)
@@ -23,6 +25,12 @@ export default function JobTab({ job, fit, onJobScraped, onFitAnalyzed, onGenera
   const [customContext, setCustomContext] = useState('')
   const [docMode, setDocMode] = useState<DocMode>('both')
   const [error, setError] = useState('')
+  const [showTip, setShowTip] = useState(() => localStorage.getItem(SCRAPE_TIP_KEY) !== 'true')
+
+  function dismissTip() {
+    localStorage.setItem(SCRAPE_TIP_KEY, 'true')
+    setShowTip(false)
+  }
 
   async function handleScrape() {
     setScraping(true)
@@ -221,6 +229,14 @@ export default function JobTab({ job, fit, onJobScraped, onFitAnalyzed, onGenera
         )}
 
       </div>
+
+      {/* Scrape tip banner */}
+      {showTip && (
+        <div className="shrink-0 flex items-center gap-3 px-4 py-2.5 bg-amber-500/10 border-t border-amber-500/20 text-amber-700 dark:text-amber-400 text-xs">
+          <span className="flex-1">Having trouble scraping? Try refreshing the page first.</span>
+          <button onClick={dismissTip} className="shrink-0 text-amber-600 dark:text-amber-500 hover:text-amber-800 dark:hover:text-amber-300 transition-colors text-sm leading-none">✕</button>
+        </div>
+      )}
     </div>
   )
 }
@@ -348,12 +364,13 @@ function signalColor(match: 'strong' | 'partial' | 'missing') {
 
 function fieldTypeColor(type: string) {
   const map: Record<string, string> = {
-    textarea: 'bg-purple-500/20 text-purple-300',
-    file: 'bg-blue-500/20 text-blue-300',
-    select: 'bg-orange-500/20 text-orange-300',
-    text: 'bg-slate-500/20 text-slate-300',
+    textarea: 'bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300',
+    file:     'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300',
+    select:   'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-300',
+    radio:    'bg-slate-100 dark:bg-slate-500/20 text-slate-600 dark:text-slate-400',
+    text:     'bg-slate-100 dark:bg-slate-500/20 text-slate-600 dark:text-slate-300',
   }
-  return map[type] ?? 'bg-slate-500/20 text-slate-400'
+  return map[type] ?? 'bg-slate-100 dark:bg-slate-500/20 text-slate-600 dark:text-slate-400'
 }
 
 // ── Content script bridge ─────────────────────────────────────────────────────
