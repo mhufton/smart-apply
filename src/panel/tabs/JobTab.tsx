@@ -121,8 +121,9 @@ export default function JobTab({ job, fit, onJobScraped, onFitAnalyzed, onGenera
   }
 
   return (
-    <div className="h-full overflow-y-auto">
+    <div className="h-full flex flex-col">
       <ErrorBanner error={error} onDismiss={() => setError('')} />
+      <div className="flex-1 overflow-y-auto">
       <div className="p-4 space-y-4">
 
         {/* Scrape */}
@@ -229,8 +230,9 @@ export default function JobTab({ job, fit, onJobScraped, onFitAnalyzed, onGenera
         )}
 
       </div>
+      </div>
 
-      {/* Scrape tip banner */}
+      {/* Scrape tip banner — pinned to bottom */}
       {showTip && (
         <div className="shrink-0 flex items-center gap-3 px-4 py-2.5 bg-amber-500/10 border-t border-amber-500/20 text-amber-700 dark:text-amber-400 text-xs">
           <span className="flex-1">Having trouble scraping? Try refreshing the page first.</span>
