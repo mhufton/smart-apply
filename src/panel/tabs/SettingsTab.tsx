@@ -3,10 +3,11 @@ import { getProviderConfig, saveProviderConfig, clearProviderConfig } from '../l
 import type { ProviderConfig } from '../lib/claude'
 
 const PRESETS: { label: string; endpoint: string; keyPrefix: string; smallModel: string; largeModel: string; docsUrl: string }[] = [
-  { label: 'OpenAI',     endpoint: 'https://api.openai.com/v1',      keyPrefix: 'sk-',    smallModel: 'gpt-4o-mini',                largeModel: 'gpt-4o',                         docsUrl: 'https://platform.openai.com/api-keys' },
-  { label: 'Groq',       endpoint: 'https://api.groq.com/openai/v1', keyPrefix: 'gsk_',   smallModel: 'llama-3.1-8b-instant',       largeModel: 'llama-3.3-70b-versatile',        docsUrl: 'https://console.groq.com/keys' },
-  { label: 'OpenRouter', endpoint: 'https://openrouter.ai/api/v1',   keyPrefix: 'sk-or-', smallModel: 'anthropic/claude-haiku-3-5', largeModel: 'anthropic/claude-sonnet-4-5',    docsUrl: 'https://openrouter.ai/keys' },
-  { label: 'Custom',     endpoint: '',                                keyPrefix: '',       smallModel: '',                           largeModel: '',                                docsUrl: '' },
+  { label: 'OpenAI',     endpoint: 'https://api.openai.com/v1',                              keyPrefix: 'sk-',    smallModel: 'gpt-4o-mini',                largeModel: 'gpt-4o',                      docsUrl: 'https://platform.openai.com/api-keys' },
+  { label: 'Gemini',     endpoint: 'https://generativelanguage.googleapis.com/v1beta/openai', keyPrefix: 'AI',     smallModel: 'gemini-2.0-flash',            largeModel: 'gemini-2.5-pro-preview-03-25', docsUrl: 'https://aistudio.google.com/apikey' },
+  { label: 'Groq',       endpoint: 'https://api.groq.com/openai/v1',                         keyPrefix: 'gsk_',   smallModel: 'llama-3.1-8b-instant',        largeModel: 'llama-3.3-70b-versatile',     docsUrl: 'https://console.groq.com/keys' },
+  { label: 'OpenRouter', endpoint: 'https://openrouter.ai/api/v1',                           keyPrefix: 'sk-or-', smallModel: 'anthropic/claude-haiku-3-5',  largeModel: 'anthropic/claude-sonnet-4-5', docsUrl: 'https://openrouter.ai/keys' },
+  { label: 'Custom',     endpoint: '',                                                        keyPrefix: '',       smallModel: '',                            largeModel: '',                            docsUrl: '' },
 ]
 
 export default function SettingsTab() {
@@ -152,7 +153,7 @@ export default function SettingsTab() {
                 {/* Preset selector */}
                 <div>
                   <label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider">Provider preset</label>
-                  <div className="grid grid-cols-4 gap-1">
+                  <div className="grid grid-cols-5 gap-1">
                     {PRESETS.map((p, i) => (
                       <button
                         key={p.label}

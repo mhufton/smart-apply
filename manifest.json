@@ -12,6 +12,7 @@
   "host_permissions": [
     "https://api.anthropic.com/*",
     "https://api.openai.com/*",
+    "https://generativelanguage.googleapis.com/*",
     "https://api.groq.com/*",
     "https://openrouter.ai/*",
     "https://*.linkedin.com/*"
