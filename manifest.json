@@ -10,7 +10,6 @@
     "scripting"
   ],
   "host_permissions": [
-    "http://localhost:*/*",
     "https://api.anthropic.com/*",
     "https://*.linkedin.com/*"
   ],
