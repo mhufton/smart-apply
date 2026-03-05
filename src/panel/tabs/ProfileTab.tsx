@@ -15,15 +15,19 @@ export default function ProfileTab() {
   const [projectBlurb, setProjectBlurb] = useState('')
   const [extracting, setExtracting] = useState(false)
   const [error, setError] = useState('')
+  const [showImport, setShowImport] = useState(true)
 
   useEffect(() => {
-    loadProfile().then(setProfile)
+    loadProfile().then(p => {
+      setProfile(p)
+      const hasData = !!(p?.basics.name || p?.experiences?.length)
+      if (hasData) setShowImport(false)
+    })
   }, [])
 
   if (!profile) return null
 
   const hasProfile = !!(profile.basics.name || profile.experiences?.length)
-  const [showImport, setShowImport] = useState(!hasProfile)
 
   function update(patch: Partial<MasterProfile>) {
     setProfile(prev => prev ? { ...prev, ...patch } : prev)
