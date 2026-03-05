@@ -3,6 +3,7 @@ import type { GeneratedDocuments, ScrapedJob, DocHistoryEntry } from '../../type
 import Spinner from '../components/Spinner'
 import { renderMarkdown } from '../lib/markdown'
 import { loadDocHistory, deleteDocHistoryEntry, appendDocHistory, loadProfile } from '../lib/storage'
+import { callSmall, buildFormFillPrompt } from '../lib/claude'
 
 interface Props {
   docs: GeneratedDocuments | null
@@ -89,17 +90,21 @@ export default function DocumentsTab({ docs, job, generating, onDocsChange, onOp
     if (!job || !docs) return
     setInjecting(true)
     try {
-      const fieldMap: Record<string, string> = {}
-      for (const field of job.formFields) {
-        const label = field.label.toLowerCase()
-        if (field.type === 'textarea' && (label.includes('cover') || label.includes('letter'))) {
-          fieldMap[field.selector] = docs.coverLetter
-        }
-        if (field.type === 'textarea' && label.includes('summary')) {
-          fieldMap[field.selector] = docs.cv.split('\n\n')[0] ?? ''
-        }
-      }
+      const profile = await loadProfile()
+      const prompt = buildFormFillPrompt(job.formFields, profile, docs.coverLetter)
+      if (!prompt) return
+
+      let raw = ''
+      await callSmall([{ role: 'user', content: prompt }], chunk => { raw += chunk })
+
+      // Extract JSON from response
+      const jsonMatch = raw.match(/\{[\s\S]*\}/)
+      if (!jsonMatch) throw new Error('No JSON in response')
+      const fieldMap: Record<string, string> = JSON.parse(jsonMatch[0])
+
       await chrome.runtime.sendMessage({ type: 'INJECT_FIELDS', payload: fieldMap })
+    } catch (e) {
+      console.error('[Smart Apply] Form fill failed:', e)
     } finally {
       setInjecting(false)
     }

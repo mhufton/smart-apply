@@ -493,6 +493,51 @@ Description:
 ${description}`
 }
 
+export function buildFormFillPrompt(
+  fields: import('../../types').FormField[],
+  profile: MasterProfile,
+  coverLetter: string
+): string {
+  const fillable = fields.filter(f => f.type !== 'file' && f.type !== 'radio' && f.type !== 'checkbox')
+  if (!fillable.length) return ''
+
+  const fieldList = fillable.map(f =>
+    `- selector: "${f.selector}" | label: "${f.label}" | type: ${f.type}${f.required ? ' | required' : ''}`
+  ).join('\n')
+
+  const basics = profile.basics
+  const contextAnswers = (profile.contextNotes ?? [])
+    .map(n => `${n.label ? n.label + ': ' : ''}${n.content}`)
+    .join('\n')
+
+  return `You are filling in a job application form. Map the form fields below to the candidate's data.
+
+## Candidate data
+Name: ${basics.name}
+Email: ${basics.email}
+Phone: ${basics.phone}
+Location: ${basics.location}
+LinkedIn: ${basics.linkedin}
+${basics.website ? `Website: ${basics.website}` : ''}
+${contextAnswers ? `\nAdditional info (use for questions about notice period, right to work, salary, etc.):\n${contextAnswers}` : ''}
+
+## Cover letter (use for any cover letter or personal statement field)
+${coverLetter.slice(0, 1500)}
+
+## Form fields to fill
+${fieldList}
+
+## Instructions
+Return ONLY a valid JSON object mapping each selector to the value to fill in.
+Only include fields you can confidently fill — omit fields where you have no relevant data.
+For select fields, return the most appropriate option value as a plain string.
+For textarea fields containing "cover", "letter", or "statement", use the full cover letter text.
+Do not include file upload fields.
+
+Example output:
+{"#full_name": "Jane Smith", "#email": "jane@example.com", "[name=phone]": "+44 7700 000000"}`
+}
+
 export function parseDocsResponse(raw: string, mode: DocMode = 'both'): GeneratedDocuments {
   const cvMatch = raw.match(/## CV\s*([\s\S]+?)(?=## Cover Letter|$)/)
   const clMatch = raw.match(/## Cover Letter\s*([\s\S]+?)$/)
