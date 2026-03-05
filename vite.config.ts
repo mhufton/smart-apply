@@ -9,6 +9,9 @@ export default defineConfig({
     crx({ manifest }),
   ],
   build: {
+    // Vite's module preload polyfill calls fetch() on chrome-extension:// URLs,
+    // which always fails and loops in extension contexts. Disable it.
+    modulePreload: { polyfill: false },
     rollupOptions: {
       input: {
         panel: 'panel.html',
