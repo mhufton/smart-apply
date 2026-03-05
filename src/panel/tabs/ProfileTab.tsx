@@ -22,6 +22,9 @@ export default function ProfileTab() {
 
   if (!profile) return null
 
+  const hasProfile = !!(profile.basics.name || profile.experiences?.length)
+  const [showImport, setShowImport] = useState(!hasProfile)
+
   function update(patch: Partial<MasterProfile>) {
     setProfile(prev => prev ? { ...prev, ...patch } : prev)
     setSaved(false)
@@ -233,40 +236,55 @@ export default function ProfileTab() {
       <div className="p-4 space-y-4">
 
         {/* Import Actions */}
-        <Section title="Import">
-          <div className="space-y-3">
-            <button
-              onClick={handleScrapeLinkedIn}
-              disabled={scraping}
-              className="btn-secondary w-full flex items-center justify-center gap-2"
-            >
-              {scraping && <Spinner className="w-3 h-3" />}
-              {scraping ? 'Scraping...' : 'Scrape LinkedIn page'}
-            </button>
-
-            {error && (
-              <p className="text-xs text-red-400 bg-red-500/10 rounded-lg p-2 mt-2">{error}</p>
-            )}
-
-            <div>
-              <p className="text-xs text-slate-400 mb-1">Paste resume text</p>
-              <textarea
-                value={resumeText}
-                onChange={e => setResumeText(e.target.value)}
-                placeholder="Paste your resume text here..."
-                className="input-base h-24 resize-none w-full"
-              />
+        {showImport ? (
+          <Section title="Import">
+            <div className="space-y-3">
               <button
-                onClick={handleParseResume}
-                disabled={parsing || !resumeText.trim()}
-                className="btn-secondary w-full mt-2 flex items-center justify-center gap-2"
+                onClick={handleScrapeLinkedIn}
+                disabled={scraping}
+                className="btn-secondary w-full flex items-center justify-center gap-2"
               >
-                {parsing && <Spinner className="w-3 h-3" />}
-                {parsing ? 'Parsing...' : 'Parse resume'}
+                {scraping && <Spinner className="w-3 h-3" />}
+                {scraping ? 'Scraping...' : 'Scrape LinkedIn page'}
               </button>
+
+              {error && (
+                <p className="text-xs text-red-400 bg-red-500/10 rounded-lg p-2 mt-2">{error}</p>
+              )}
+
+              <div>
+                <p className="text-xs text-slate-400 mb-1">Paste resume text</p>
+                <textarea
+                  value={resumeText}
+                  onChange={e => setResumeText(e.target.value)}
+                  placeholder="Paste your resume text here..."
+                  className="input-base h-24 resize-none w-full"
+                />
+                <button
+                  onClick={handleParseResume}
+                  disabled={parsing || !resumeText.trim()}
+                  className="btn-secondary w-full mt-2 flex items-center justify-center gap-2"
+                >
+                  {parsing && <Spinner className="w-3 h-3" />}
+                  {parsing ? 'Parsing...' : 'Parse resume'}
+                </button>
+              </div>
+
+              {hasProfile && (
+                <button onClick={() => setShowImport(false)} className="text-[10px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 w-full text-center transition-colors">
+                  Hide import
+                </button>
+              )}
             </div>
-          </div>
-        </Section>
+          </Section>
+        ) : (
+          <button
+            onClick={() => setShowImport(true)}
+            className="w-full text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors text-center py-1"
+          >
+            + Re-import from LinkedIn or resume
+          </button>
+        )}
 
         {/* Basics */}
         <Section title="Basics">
