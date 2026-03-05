@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import type { ScrapedJob, FitAnalysis, GeneratedDocuments } from '../../types'
-import { callHaiku, callSonnet, buildFitPrompt, buildDocsPrompt } from '../lib/claude'
+import { callHaiku, callSonnet, buildFitPrompt, buildDocsPrompt, parseDocsResponse, type DocMode } from '../lib/claude'
 import { loadProfile } from '../lib/storage'
 import ErrorBanner from '../components/ErrorBanner'
+import Spinner from '../components/Spinner'
 
 interface Props {
   job: ScrapedJob | null
@@ -10,14 +11,17 @@ interface Props {
   onJobScraped: (job: ScrapedJob) => void
   onFitAnalyzed: (fit: FitAnalysis) => void
   onGenerateDocs: (docs: GeneratedDocuments) => void
+  onGenerateStart: () => void
+  onGenerateDone: () => void
 }
 
-export default function JobTab({ job, fit, onJobScraped, onFitAnalyzed, onGenerateDocs }: Props) {
+export default function JobTab({ job, fit, onJobScraped, onFitAnalyzed, onGenerateDocs, onGenerateStart, onGenerateDone }: Props) {
   const [scraping, setScraping] = useState(false)
   const [analyzing, setAnalyzing] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [activeAngles, setActiveAngles] = useState<string[]>([])
   const [customContext, setCustomContext] = useState('')
+  const [docMode, setDocMode] = useState<DocMode>('both')
   const [error, setError] = useState('')
 
   async function handleScrape() {
@@ -56,6 +60,7 @@ export default function JobTab({ job, fit, onJobScraped, onFitAnalyzed, onGenera
     if (!job) return
     setGenerating(true)
     setError('')
+    onGenerateStart()
     try {
       const profile = await loadProfile()
       const context = [
@@ -63,15 +68,17 @@ export default function JobTab({ job, fit, onJobScraped, onFitAnalyzed, onGenera
         customContext ? `Additional context: ${customContext}` : '',
       ].filter(Boolean).join('\n')
 
-      const prompt = buildDocsPrompt(job, profile, context)
+      const prompt = buildDocsPrompt(job, profile, context, docMode)
       let raw = ''
-      await callSonnet([{ role: 'user', content: prompt }], (chunk) => { raw += chunk })
-      const docs = parseDocsResponse(raw)
-      onGenerateDocs(docs)
+      await callSonnet([{ role: 'user', content: prompt }], (chunk) => {
+        raw += chunk
+        onGenerateDocs(parseDocsResponse(raw, docMode))
+      })
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Document generation failed.')
     } finally {
       setGenerating(false)
+      onGenerateDone()
     }
   }
 
@@ -91,8 +98,9 @@ export default function JobTab({ job, fit, onJobScraped, onFitAnalyzed, onGenera
           <button
             onClick={handleScrape}
             disabled={scraping}
-            className="btn-primary w-full"
+            className="btn-primary w-full flex items-center justify-center gap-2"
           >
+            {scraping && <Spinner className="w-3 h-3" />}
             {scraping ? 'Scraping...' : 'Scrape this page'}
           </button>
 
@@ -106,7 +114,7 @@ export default function JobTab({ job, fit, onJobScraped, onFitAnalyzed, onGenera
               {job.description && (
                 <div className="mt-2">
                   <p className="text-xs text-slate-500 mb-1">Description</p>
-                  <div className="text-xs text-slate-300 bg-white/5 rounded-lg p-3 max-h-40 overflow-y-auto whitespace-pre-wrap leading-relaxed">
+                  <div className="text-xs text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-white/5 rounded-lg p-3 max-h-40 overflow-y-auto whitespace-pre-wrap leading-relaxed">
                     {job.description}
                   </div>
                 </div>
@@ -121,8 +129,9 @@ export default function JobTab({ job, fit, onJobScraped, onFitAnalyzed, onGenera
             <button
               onClick={handleAnalyzeFit}
               disabled={analyzing}
-              className="btn-secondary w-full"
+              className="btn-secondary w-full flex items-center justify-center gap-2"
             >
+              {analyzing && <Spinner className="w-3 h-3" />}
               {analyzing ? 'Analyzing...' : fit ? 'Re-analyze fit' : 'Analyze my fit'}
             </button>
 
@@ -142,12 +151,29 @@ export default function JobTab({ job, fit, onJobScraped, onFitAnalyzed, onGenera
                 className="input-base h-20 resize-none w-full"
               />
             </div>
+            <div className="flex rounded-lg overflow-hidden border border-white/10 mb-3 text-xs">
+              {(['cv', 'cover-letter', 'both'] as DocMode[]).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => setDocMode(mode)}
+                  className={[
+                    'flex-1 py-1.5 transition-colors',
+                    docMode === mode
+                      ? 'bg-indigo-600 text-white'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-white/5',
+                  ].join(' ')}
+                >
+                  {mode === 'cv' ? 'CV' : mode === 'cover-letter' ? 'Cover Letter' : 'Both'}
+                </button>
+              ))}
+            </div>
             <button
               onClick={handleGenerateDocs}
               disabled={generating}
-              className="btn-primary w-full"
+              className="btn-primary w-full flex items-center justify-center gap-2"
             >
-              {generating ? 'Generating...' : 'Generate CV + Cover Letter'}
+              {generating && <Spinner className="w-3 h-3" />}
+              {generating ? 'Generating...' : `Generate ${docMode === 'cv' ? 'CV' : docMode === 'cover-letter' ? 'Cover Letter' : 'CV + Cover Letter'}`}
             </button>
           </Section>
         )}
@@ -193,7 +219,7 @@ function FitDetail({
   return (
     <div className="mt-3 space-y-3">
       {/* Score */}
-      <div className="flex items-center gap-3 bg-white/5 rounded-lg p-3">
+      <div className="flex items-center gap-3 bg-slate-100 dark:bg-white/5 rounded-lg p-3">
         <span className={`text-3xl font-bold tabular-nums ${scoreColor}`}>{fit.score}</span>
         <div>
           <p className="text-xs font-medium text-slate-200">{fit.headline}</p>
@@ -274,8 +300,8 @@ function FitDetail({
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="bg-white/[0.03] rounded-xl border border-white/5 p-4">
-      <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">{title}</h2>
+    <div className="bg-black/[0.02] dark:bg-white/[0.03] rounded-xl border border-slate-200 dark:border-white/5 p-4">
+      <h2 className="text-xs font-semibold text-slate-400 dark:text-slate-400 uppercase tracking-widest mb-3">{title}</h2>
       {children}
     </div>
   )
@@ -292,9 +318,9 @@ function Field({ label, value }: { label: string; value: string }) {
 }
 
 function signalColor(match: 'strong' | 'partial' | 'missing') {
-  if (match === 'strong') return 'bg-emerald-400'
-  if (match === 'partial') return 'bg-yellow-400'
-  return 'bg-slate-600'
+  if (match === 'strong') return 'bg-emerald-500'
+  if (match === 'partial') return 'bg-yellow-500'
+  return 'bg-slate-400'
 }
 
 function fieldTypeColor(type: string) {
@@ -332,12 +358,3 @@ function parseFitResponse(raw: string): FitAnalysis {
   }
 }
 
-function parseDocsResponse(raw: string): GeneratedDocuments {
-  const cvMatch = raw.match(/## CV\s*([\s\S]+?)(?=## Cover Letter|$)/)
-  const clMatch = raw.match(/## Cover Letter\s*([\s\S]+?)$/)
-  return {
-    cv: cvMatch?.[1]?.trim() ?? raw,
-    coverLetter: clMatch?.[1]?.trim() ?? '',
-    generatedAt: Date.now(),
-  }
-}

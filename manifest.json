@@ -6,11 +6,13 @@
   "permissions": [
     "activeTab",
     "storage",
-    "sidePanel"
+    "sidePanel",
+    "scripting"
   ],
   "host_permissions": [
     "http://localhost:*/*",
-    "https://api.anthropic.com/*"
+    "https://api.anthropic.com/*",
+    "https://*.linkedin.com/*"
   ],
   "background": {
     "service_worker": "src/background/index.ts",
@@ -19,6 +21,7 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
+      "exclude_matches": ["*://*.linkedin.com/*"],
       "js": ["src/content/index.tsx"],
       "run_at": "document_idle"
     }
@@ -38,5 +41,12 @@
   },
   "side_panel": {
     "default_path": "panel.html"
-  }
+  },
+  "web_accessible_resources": [
+    {
+      "matches": ["<all_urls>"],
+      "resources": ["panel.html", "assets/*"],
+      "use_dynamic_url": true
+    }
+  ]
 }

@@ -100,6 +100,17 @@ export type ExtMessage =
   | { type: 'SCRAPE_PROFILE' }
   | { type: 'INJECT_FIELDS'; payload: Record<string, string> }
 
+// ── Document History ──────────────────────────────────────────────────────────
+
+export interface DocHistoryEntry {
+  id: string
+  generatedAt: number
+  jobTitle: string
+  jobCompany: string
+  cv: string           // empty string if not generated
+  coverLetter: string  // empty string if not generated
+}
+
 // ── Chat ──────────────────────────────────────────────────────────────────────
 
 export interface ChatMessage {

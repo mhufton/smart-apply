@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import type { ChatMessage, GeneratedDocuments, ScrapedJob } from '../../types'
 import { callHaiku } from '../lib/claude'
 import ErrorBanner from '../components/ErrorBanner'
+import Spinner from '../components/Spinner'
 
 interface Props {
   messages: ChatMessage[]
@@ -120,8 +121,8 @@ export default function ChatTab({ messages, docs, job, onMessagesChange, onDocsU
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {messages.length === 0 && (
           <div className="text-center py-8">
-            <p className="text-slate-500 text-sm mb-1">Chat with Claude about your application</p>
-            <p className="text-slate-600 text-xs leading-relaxed">
+            <p className="text-slate-400 dark:text-slate-500 text-sm mb-1">Chat with Claude about your application</p>
+            <p className="text-slate-400 dark:text-slate-600 text-xs leading-relaxed">
               Try: "Remove the MongoDB bullet", "Make the opening punchier",
               "Add more about the team I led"
             </p>
@@ -135,7 +136,7 @@ export default function ChatTab({ messages, docs, job, onMessagesChange, onDocsU
                 'max-w-[85%] rounded-2xl px-3 py-2 text-xs leading-relaxed',
                 msg.role === 'user'
                   ? 'bg-indigo-600 text-white rounded-br-sm'
-                  : 'bg-white/5 text-slate-200 rounded-bl-sm',
+                  : 'bg-slate-100 dark:bg-white/5 text-slate-800 dark:text-slate-200 rounded-bl-sm',
               ].join(' ')}
             >
               <MessageContent content={msg.content} />
@@ -147,7 +148,7 @@ export default function ChatTab({ messages, docs, job, onMessagesChange, onDocsU
       </div>
 
       {/* Input */}
-      <div className="shrink-0 border-t border-white/5 bg-[#16181f] p-3">
+      <div className="shrink-0 border-t border-slate-200 dark:border-white/5 bg-white dark:bg-[#16181f] p-3">
         <div className="flex gap-2 items-end">
           <textarea
             ref={textareaRef}
@@ -163,9 +164,9 @@ export default function ChatTab({ messages, docs, job, onMessagesChange, onDocsU
             <button
               onClick={handleSend}
               disabled={streaming || !input.trim()}
-              className="btn-primary text-xs px-3 py-2"
+              className="btn-primary text-xs px-3 py-2 flex items-center gap-1.5"
             >
-              {streaming ? '...' : 'Send'}
+              {streaming ? <Spinner className="w-3 h-3" /> : 'Send'}
             </button>
             <button
               onClick={handleClear}
@@ -177,7 +178,7 @@ export default function ChatTab({ messages, docs, job, onMessagesChange, onDocsU
           </div>
         </div>
         {docs && (
-          <p className="text-[10px] text-slate-600 mt-1.5">
+          <p className="text-[10px] text-slate-400 dark:text-slate-600 mt-1.5">
             CV and cover letter are in context. Changes will update the Documents tab.
           </p>
         )}
@@ -195,7 +196,7 @@ function MessageContent({ content }: { content: string }) {
         if (part.startsWith('```')) {
           const body = part.replace(/^```\w*\n?/, '').replace(/\n?```$/, '')
           return (
-            <pre key={i} className="mt-1 bg-black/30 rounded p-2 text-[10px] font-mono overflow-x-auto whitespace-pre-wrap">
+            <pre key={i} className="mt-1 bg-black/10 dark:bg-black/30 rounded p-2 text-[10px] font-mono overflow-x-auto whitespace-pre-wrap">
               {body}
             </pre>
           )

@@ -1,4 +1,4 @@
-import type { MasterProfile, ScrapedJob } from '../../types'
+import type { MasterProfile, ScrapedJob, GeneratedDocuments } from '../../types'
 
 // ── API key ───────────────────────────────────────────────────────────────────
 
@@ -34,6 +34,7 @@ async function streamAnthropic(
       'content-type': 'application/json',
       'x-api-key': apiKey,
       'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
     },
     body: JSON.stringify({ model, messages, stream: true, max_tokens: maxTokens }),
   })
@@ -111,6 +112,14 @@ ${(profile.experiences ?? []).map(e =>
 
 Skills: ${(profile.skills ?? []).join(', ')}
 
+${(profile.projects ?? []).length > 0 ? `Projects:\n${(profile.projects ?? []).map(p =>
+  `- ${p.name}: ${p.description} [${(p.tags ?? []).join(', ')}]`
+).join('\n')}` : ''}
+
+${(profile.contextNotes ?? []).length > 0 ? `Additional context:\n${(profile.contextNotes ?? []).map(n =>
+  `${n.label ? n.label + ': ' : ''}${n.content}`
+).join('\n')}` : ''}
+
 ## Job
 Title: ${job.title}
 Company: ${job.company}
@@ -184,12 +193,43 @@ Resume text:
 ${resumeText}`
 }
 
+export type DocMode = 'both' | 'cv' | 'cover-letter'
+
 export function buildDocsPrompt(
   job: ScrapedJob,
   profile: MasterProfile,
-  context: string
+  context: string,
+  mode: DocMode = 'both'
 ): string {
-  return `You are a professional CV writer. Create a tailored CV and cover letter.
+  const outputFormat =
+    mode === 'cv'
+      ? `## Output format
+Produce only a CV:
+
+## CV
+[Full tailored CV in clean markdown. Use ## for sections, bullet points for experience. Keep to 2 pages worth.]
+
+Do not include a cover letter or any other text.`
+      : mode === 'cover-letter'
+      ? `## Output format
+Produce only a cover letter:
+
+## Cover Letter
+[3-4 paragraph cover letter. Professional but not stiff. Don't start with "I am writing to apply for".]
+
+Do not include a CV or any other text.`
+      : `## Output format
+Produce two sections separated exactly as shown:
+
+## CV
+[Full tailored CV in clean markdown. Use ## for sections, bullet points for experience. Keep to 2 pages worth.]
+
+## Cover Letter
+[3-4 paragraph cover letter. Professional but not stiff. Don't start with "I am writing to apply for".]
+
+Do not include any other text outside these two sections.`
+
+  return `You are a professional CV writer. Create tailored job application documents.
 
 ## Candidate Profile
 ${JSON.stringify(profile, null, 2)}
@@ -203,14 +243,30 @@ ${job.description.slice(0, 3000)}
 ## Tailoring Instructions
 ${context || 'No specific instructions. Use your judgement to highlight the most relevant experience.'}
 
-## Output format
-Produce two sections separated exactly as shown:
+${outputFormat}`
+}
 
-## CV
-[Full tailored CV in clean markdown. Use ## for sections, bullet points for experience. Keep to 2 pages worth.]
+export function buildProjectExtractPrompt(description: string): string {
+  return `Extract a structured project entry from this description. Return ONLY valid JSON, no markdown fencing:
 
-## Cover Letter
-[3-4 paragraph cover letter. Professional but not stiff. Don't start with "I am writing to apply for".]
+{
+  "name": "short project name",
+  "description": "2-4 sentence description highlighting what was built, tech used, and impact",
+  "tags": ["tech1", "tech2", "tech3"]
+}
 
-Do not include any other text outside these two sections.`
+Be specific about technologies. Infer a good project name if not stated. Keep description concise but technically detailed.
+
+Description:
+${description}`
+}
+
+export function parseDocsResponse(raw: string, mode: DocMode = 'both'): GeneratedDocuments {
+  const cvMatch = raw.match(/## CV\s*([\s\S]+?)(?=## Cover Letter|$)/)
+  const clMatch = raw.match(/## Cover Letter\s*([\s\S]+?)$/)
+  return {
+    cv: mode === 'cover-letter' ? '' : (cvMatch?.[1]?.trim() ?? (mode === 'cv' ? raw : '')),
+    coverLetter: clMatch?.[1]?.trim() ?? '',
+    generatedAt: Date.now(),
+  }
 }

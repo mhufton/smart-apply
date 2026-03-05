@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import type { MasterProfile, Experience, Education } from '../../types'
+import type { MasterProfile, Experience, Education, Project, ContextNote } from '../../types'
 import { loadProfile, saveProfile } from '../lib/storage'
-import { callHaiku, buildResumeParsePrompt } from '../lib/claude'
+import { callHaiku, buildResumeParsePrompt, buildProjectExtractPrompt } from '../lib/claude'
+import Spinner from '../components/Spinner'
 
 export default function ProfileTab() {
   const [profile, setProfile] = useState<MasterProfile | null>(null)
@@ -11,6 +12,8 @@ export default function ProfileTab() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [newSkill, setNewSkill] = useState('')
+  const [projectBlurb, setProjectBlurb] = useState('')
+  const [extracting, setExtracting] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -136,6 +139,66 @@ export default function ProfileTab() {
     update({ skills: (profile!.skills ?? []).filter(s => s !== skill) })
   }
 
+  async function handleExtractProject() {
+    if (!projectBlurb.trim() || !profile) return
+    setExtracting(true)
+    try {
+      const prompt = buildProjectExtractPrompt(projectBlurb)
+      let raw = ''
+      await callHaiku([{ role: 'user', content: prompt }], (chunk) => { raw += chunk })
+      const jsonMatch = raw.match(/```json\s*([\s\S]+?)\s*```/) ?? raw.match(/(\{[\s\S]+\})/)
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[1]) as Partial<Project>
+        const project: Project = {
+          id: `proj-${Date.now()}`,
+          name: parsed.name ?? 'Untitled project',
+          description: parsed.description ?? '',
+          tags: parsed.tags ?? [],
+        }
+        update({ projects: [...(profile.projects ?? []), project] })
+        setProjectBlurb('')
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to extract project.')
+    } finally {
+      setExtracting(false)
+    }
+  }
+
+  function addProject() {
+    update({
+      projects: [
+        ...(profile!.projects ?? []),
+        { id: `proj-${Date.now()}`, name: '', description: '', tags: [] },
+      ],
+    })
+  }
+
+  function updateProject(id: string, patch: Partial<Project>) {
+    update({ projects: (profile!.projects ?? []).map(p => p.id === id ? { ...p, ...patch } : p) })
+  }
+
+  function removeProject(id: string) {
+    update({ projects: (profile!.projects ?? []).filter(p => p.id !== id) })
+  }
+
+  function addContextNote() {
+    update({
+      contextNotes: [
+        ...(profile!.contextNotes ?? []),
+        { id: `note-${Date.now()}`, label: '', content: '' },
+      ],
+    })
+  }
+
+  function updateContextNote(id: string, patch: Partial<ContextNote>) {
+    update({ contextNotes: (profile!.contextNotes ?? []).map(n => n.id === id ? { ...n, ...patch } : n) })
+  }
+
+  function removeContextNote(id: string) {
+    update({ contextNotes: (profile!.contextNotes ?? []).filter(n => n.id !== id) })
+  }
+
   function addEducation() {
     update({
       education: [...(profile!.education ?? []), { institution: '', degree: '', dates: '' }],
@@ -162,8 +225,9 @@ export default function ProfileTab() {
             <button
               onClick={handleScrapeLinkedIn}
               disabled={scraping}
-              className="btn-secondary w-full"
+              className="btn-secondary w-full flex items-center justify-center gap-2"
             >
+              {scraping && <Spinner className="w-3 h-3" />}
               {scraping ? 'Scraping...' : 'Scrape LinkedIn page'}
             </button>
 
@@ -182,8 +246,9 @@ export default function ProfileTab() {
               <button
                 onClick={handleParseResume}
                 disabled={parsing || !resumeText.trim()}
-                className="btn-secondary w-full mt-2"
+                className="btn-secondary w-full mt-2 flex items-center justify-center gap-2"
               >
+                {parsing && <Spinner className="w-3 h-3" />}
                 {parsing ? 'Parsing...' : 'Parse resume'}
               </button>
             </div>
@@ -222,7 +287,7 @@ export default function ProfileTab() {
         <Section title="Experience">
           <div className="space-y-3">
             {(profile.experiences ?? []).map(exp => (
-              <div key={exp.id} className="bg-white/5 rounded-lg p-3 space-y-2">
+              <div key={exp.id} className="bg-slate-100 dark:bg-white/5 rounded-lg p-3 space-y-2">
                 <div className="flex gap-2">
                   <input
                     type="text"
@@ -305,7 +370,7 @@ export default function ProfileTab() {
         <Section title="Education">
           <div className="space-y-3">
             {(profile.education ?? []).map((edu, i) => (
-              <div key={i} className="bg-white/5 rounded-lg p-3 space-y-2">
+              <div key={i} className="bg-slate-100 dark:bg-white/5 rounded-lg p-3 space-y-2">
                 <div className="flex gap-2">
                   <input
                     type="text"
@@ -345,6 +410,106 @@ export default function ProfileTab() {
           </div>
         </Section>
 
+        {/* Projects */}
+        <Section title="Projects & Side Work">
+          <div className="space-y-3">
+            {/* Quick-extract from blurb */}
+            <div className="bg-indigo-500/5 border border-indigo-500/15 rounded-lg p-3 space-y-2">
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                Describe something you built in plain English — Claude will extract it as a structured project.
+              </p>
+              <textarea
+                value={projectBlurb}
+                onChange={e => setProjectBlurb(e.target.value)}
+                placeholder="e.g. I built an AI summary app that lives in the iOS/Android share sheet, using Google Cloud and a self-hosted Vertex AI backend running Gemini..."
+                className="input-base h-20 resize-none w-full"
+              />
+              <button
+                onClick={handleExtractProject}
+                disabled={extracting || !projectBlurb.trim()}
+                className="btn-secondary w-full flex items-center justify-center gap-2"
+              >
+                {extracting && <Spinner className="w-3 h-3" />}
+                {extracting ? 'Extracting...' : 'Add as project'}
+              </button>
+            </div>
+
+            {/* Project list */}
+            {(profile.projects ?? []).map(proj => (
+              <div key={proj.id} className="bg-slate-100 dark:bg-white/5 rounded-lg p-3 space-y-2">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={proj.name}
+                    onChange={e => updateProject(proj.id, { name: e.target.value })}
+                    placeholder="Project name"
+                    className="input-base flex-1"
+                  />
+                  <button
+                    onClick={() => removeProject(proj.id)}
+                    className="text-xs text-red-400 hover:text-red-300 px-2"
+                  >
+                    Remove
+                  </button>
+                </div>
+                <textarea
+                  value={proj.description}
+                  onChange={e => updateProject(proj.id, { description: e.target.value })}
+                  placeholder="What you built, how, and why it matters..."
+                  className="input-base h-16 resize-none w-full text-xs"
+                />
+                <input
+                  type="text"
+                  value={(proj.tags ?? []).join(', ')}
+                  onChange={e => updateProject(proj.id, { tags: e.target.value.split(',').map(t => t.trim()).filter(Boolean) })}
+                  placeholder="Tags: React, Python, AWS..."
+                  className="input-base w-full text-xs"
+                />
+              </div>
+            ))}
+            <button onClick={addProject} className="btn-secondary w-full text-xs">
+              + Add project manually
+            </button>
+          </div>
+        </Section>
+
+        {/* Context Notes */}
+        <Section title="Context Notes">
+          <p className="text-xs text-slate-400 dark:text-slate-500 mb-3 leading-relaxed">
+            Freeform notes fed directly into CV and cover letter generation. Use these for things that don't fit neatly elsewhere — gaps, career pivots, things you want to emphasise or avoid.
+          </p>
+          <div className="space-y-3">
+            {(profile.contextNotes ?? []).map(note => (
+              <div key={note.id} className="space-y-1.5">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={note.label}
+                    onChange={e => updateContextNote(note.id, { label: e.target.value })}
+                    placeholder="Label, e.g. 'Career pivot' or 'Don't mention'"
+                    className="input-base flex-1 text-xs"
+                  />
+                  <button
+                    onClick={() => removeContextNote(note.id)}
+                    className="text-xs text-red-400 hover:text-red-300 px-2"
+                  >
+                    Remove
+                  </button>
+                </div>
+                <textarea
+                  value={note.content}
+                  onChange={e => updateContextNote(note.id, { content: e.target.value })}
+                  placeholder="Write anything useful for Claude to know..."
+                  className="input-base h-16 resize-none w-full text-xs"
+                />
+              </div>
+            ))}
+            <button onClick={addContextNote} className="btn-secondary w-full text-xs">
+              + Add note
+            </button>
+          </div>
+        </Section>
+
         {/* Save */}
         <button
           onClick={handleSave}
@@ -361,7 +526,7 @@ export default function ProfileTab() {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="bg-white/[0.03] rounded-xl border border-white/5 p-4">
+    <div className="bg-black/[0.02] dark:bg-white/[0.03] rounded-xl border border-slate-200 dark:border-white/5 p-4">
       <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">{title}</h2>
       {children}
     </div>
