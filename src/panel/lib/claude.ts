@@ -1,33 +1,60 @@
 import type { MasterProfile, ScrapedJob, GeneratedDocuments } from '../../types'
 
-// ── API key ───────────────────────────────────────────────────────────────────
+// ── Provider config ───────────────────────────────────────────────────────────
 
+export type Provider = 'anthropic' | 'openai-compatible'
+
+export interface ProviderConfig {
+  provider: Provider
+  apiKey: string
+  endpoint: string  // base URL — only used for openai-compatible
+  model: string     // model for all calls — only used for openai-compatible
+}
+
+const CONFIG_KEY = 'providerConfig'
+const LEGACY_KEY = 'anthropicApiKey'
+
+export async function getProviderConfig(): Promise<ProviderConfig | null> {
+  const result = await chrome.storage.local.get([CONFIG_KEY, LEGACY_KEY])
+  if (result[CONFIG_KEY]) return result[CONFIG_KEY] as ProviderConfig
+  // Backward compat: migrate old anthropicApiKey
+  if (result[LEGACY_KEY]) {
+    return { provider: 'anthropic', apiKey: result[LEGACY_KEY], endpoint: '', model: '' }
+  }
+  return null
+}
+
+export async function saveProviderConfig(config: ProviderConfig): Promise<void> {
+  await chrome.storage.local.set({ [CONFIG_KEY]: config })
+}
+
+export async function clearProviderConfig(): Promise<void> {
+  await chrome.storage.local.remove([CONFIG_KEY, LEGACY_KEY])
+}
+
+// Legacy helpers kept for backward compat
 export async function getApiKey(): Promise<string | null> {
-  const result = await chrome.storage.local.get('anthropicApiKey')
-  return result.anthropicApiKey ?? null
+  const config = await getProviderConfig()
+  return config?.apiKey ?? null
 }
-
 export async function saveApiKey(key: string): Promise<void> {
-  await chrome.storage.local.set({ anthropicApiKey: key })
+  await saveProviderConfig({ provider: 'anthropic', apiKey: key, endpoint: '', model: '' })
 }
-
 export async function clearApiKey(): Promise<void> {
-  await chrome.storage.local.remove('anthropicApiKey')
+  await clearProviderConfig()
 }
 
-// ── Core streaming call ───────────────────────────────────────────────────────
+// ── Core streaming calls ──────────────────────────────────────────────────────
 
 export type ApiMessage = { role: 'user' | 'assistant'; content: string }
 
 async function streamAnthropic(
   model: string,
   messages: ApiMessage[],
+  apiKey: string,
   onChunk: (text: string) => void,
-  maxTokens = 4096
+  maxTokens: number
 ): Promise<void> {
-  const apiKey = await getApiKey()
-  if (!apiKey) throw new Error('No Anthropic API key set. Add one in the Settings tab.')
-
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -44,35 +71,78 @@ async function streamAnthropic(
     throw new Error(`Anthropic API error ${response.status}: ${body}`)
   }
 
+  await readSSE(response, (json) => {
+    if (json.type === 'content_block_delta' && json.delta?.type === 'text_delta') {
+      onChunk(json.delta.text)
+    }
+  })
+}
+
+async function streamOpenAICompat(
+  model: string,
+  messages: ApiMessage[],
+  apiKey: string,
+  endpoint: string,
+  onChunk: (text: string) => void,
+  maxTokens: number
+): Promise<void> {
+  const base = endpoint.replace(/\/$/, '')
+  const response = await fetch(`${base}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'authorization': `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({ model, messages, stream: true, max_tokens: maxTokens }),
+  })
+
+  if (!response.ok) {
+    const body = await response.text()
+    throw new Error(`API error ${response.status}: ${body}`)
+  }
+
+  await readSSE(response, (json) => {
+    const content = json.choices?.[0]?.delta?.content
+    if (typeof content === 'string') onChunk(content)
+  })
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function readSSE(response: Response, onEvent: (json: any) => void): Promise<void> {
   const reader = response.body?.getReader()
   if (!reader) throw new Error('No response body')
-
   const decoder = new TextDecoder()
   let buffer = ''
-
   while (true) {
     const { done, value } = await reader.read()
     if (done) break
-
     buffer += decoder.decode(value, { stream: true })
     const lines = buffer.split('\n')
     buffer = lines.pop() ?? ''
-
     for (const line of lines) {
       if (!line.startsWith('data: ')) continue
       const data = line.slice(6).trim()
       if (!data || data === '[DONE]') continue
-
-      try {
-        const json = JSON.parse(data)
-        if (json.type === 'content_block_delta' && json.delta?.type === 'text_delta') {
-          onChunk(json.delta.text)
-        }
-      } catch {
-        // malformed SSE line — skip
-      }
+      try { onEvent(JSON.parse(data)) } catch { /* malformed SSE — skip */ }
     }
   }
+}
+
+async function stream(
+  anthropicModel: string,
+  messages: ApiMessage[],
+  onChunk: (text: string) => void,
+  maxTokens: number
+): Promise<void> {
+  const config = await getProviderConfig()
+  if (!config) throw new Error('No API key set. Add one in the Settings tab.')
+
+  if (config.provider === 'openai-compatible') {
+    if (!config.endpoint) throw new Error('No endpoint set. Configure it in the Settings tab.')
+    return streamOpenAICompat(config.model || anthropicModel, messages, config.apiKey, config.endpoint, onChunk, maxTokens)
+  }
+
+  return streamAnthropic(anthropicModel, messages, config.apiKey, onChunk, maxTokens)
 }
 
 // ── Model callers ─────────────────────────────────────────────────────────────
@@ -82,7 +152,7 @@ export async function callHaiku(
   messages: ApiMessage[],
   onChunk: (text: string) => void
 ): Promise<void> {
-  return streamAnthropic('claude-haiku-4-5-20251001', messages, onChunk, 4096)
+  return stream('claude-haiku-4-5-20251001', messages, onChunk, 4096)
 }
 
 // Sonnet — smarter. Used for CV + cover letter generation and chat.
@@ -90,7 +160,7 @@ export async function callSonnet(
   messages: ApiMessage[],
   onChunk: (text: string) => void
 ): Promise<void> {
-  return streamAnthropic('claude-sonnet-4-5', messages, onChunk, 8192)
+  return stream('claude-sonnet-4-5', messages, onChunk, 8192)
 }
 
 // Legacy alias — points to Haiku.

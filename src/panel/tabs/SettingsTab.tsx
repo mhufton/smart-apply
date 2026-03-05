@@ -1,91 +1,225 @@
 import { useState, useEffect } from 'react'
-import { getApiKey, saveApiKey, clearApiKey } from '../lib/claude'
+import { getProviderConfig, saveProviderConfig, clearProviderConfig } from '../lib/claude'
+import type { ProviderConfig } from '../lib/claude'
+
+const PRESETS: { label: string; endpoint: string; keyPrefix: string; modelDefault: string; docsUrl: string }[] = [
+  { label: 'OpenAI',      endpoint: 'https://api.openai.com/v1',       keyPrefix: 'sk-',    modelDefault: 'gpt-4o-mini',                  docsUrl: 'https://platform.openai.com/api-keys' },
+  { label: 'Groq',        endpoint: 'https://api.groq.com/openai/v1',  keyPrefix: 'gsk_',   modelDefault: 'llama-3.3-70b-versatile',       docsUrl: 'https://console.groq.com/keys' },
+  { label: 'OpenRouter',  endpoint: 'https://openrouter.ai/api/v1',    keyPrefix: 'sk-or-', modelDefault: 'anthropic/claude-haiku-3-5',    docsUrl: 'https://openrouter.ai/keys' },
+  { label: 'Custom',      endpoint: '',                                  keyPrefix: '',       modelDefault: '',                              docsUrl: '' },
+]
 
 export default function SettingsTab() {
-  const [saved, setSaved] = useState<string | null>(null)  // masked key if set
-  const [input, setInput] = useState('')
+  const [config, setConfig] = useState<ProviderConfig | null>(null)
+  const [provider, setProvider] = useState<'anthropic' | 'openai-compatible'>('anthropic')
+  const [preset, setPreset] = useState(0)
+  const [keyInput, setKeyInput] = useState('')
+  const [endpoint, setEndpoint] = useState('')
+  const [model, setModel] = useState('')
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [error, setError] = useState('')
 
   useEffect(() => {
-    getApiKey().then(key => {
-      if (key) setSaved(maskKey(key))
+    getProviderConfig().then(cfg => {
+      if (!cfg) return
+      setConfig(cfg)
+      setProvider(cfg.provider)
+      if (cfg.provider === 'openai-compatible') {
+        setEndpoint(cfg.endpoint)
+        setModel(cfg.model)
+        const idx = PRESETS.findIndex(p => p.endpoint === cfg.endpoint)
+        setPreset(idx >= 0 ? idx : 3)
+      }
     })
   }, [])
 
+  function handlePresetChange(idx: number) {
+    setPreset(idx)
+    setEndpoint(PRESETS[idx].endpoint)
+    if (!model) setModel(PRESETS[idx].modelDefault)
+  }
+
   async function handleSave() {
-    const key = input.trim()
-    if (!key.startsWith('sk-ant-')) {
-      setError('Key should start with sk-ant-')
+    const key = keyInput.trim()
+    if (!key) { setError('Enter your API key.'); return }
+
+    if (provider === 'anthropic' && !key.startsWith('sk-ant-')) {
+      setError('Anthropic keys start with sk-ant-')
       return
     }
+    if (provider === 'openai-compatible' && !endpoint.trim()) {
+      setError('Enter the API endpoint URL.')
+      return
+    }
+
     setStatus('saving')
     setError('')
     try {
-      await saveApiKey(key)
-      setSaved(maskKey(key))
-      setInput('')
+      await saveProviderConfig({
+        provider,
+        apiKey: key,
+        endpoint: provider === 'openai-compatible' ? endpoint.trim() : '',
+        model: provider === 'openai-compatible' ? (model.trim() || PRESETS[preset].modelDefault) : '',
+      })
+      const cfg = await getProviderConfig()
+      setConfig(cfg)
+      setKeyInput('')
       setStatus('saved')
       setTimeout(() => setStatus('idle'), 2000)
     } catch {
       setStatus('error')
-      setError('Failed to save key.')
+      setError('Failed to save.')
     }
   }
 
   async function handleClear() {
-    await clearApiKey()
-    setSaved(null)
-    setInput('')
+    await clearProviderConfig()
+    setConfig(null)
+    setKeyInput('')
     setStatus('idle')
   }
+
+  const activePreset = config?.provider === 'openai-compatible'
+    ? PRESETS.find(p => p.endpoint === config.endpoint)
+    : null
 
   return (
     <div className="h-full overflow-y-auto p-4 space-y-4">
 
-      <Section title="Anthropic API Key">
-        <p className="text-xs text-slate-400 mb-3 leading-relaxed">
-          Your key is stored locally in <code className="text-indigo-400">chrome.storage.local</code> — never sent anywhere except Anthropic's API.
-          Get one at{' '}
-          <a
-            href="https://console.anthropic.com/settings/keys"
-            target="_blank"
-            rel="noreferrer"
-            className="text-indigo-400 hover:text-indigo-300 underline"
-          >
-            console.anthropic.com
-          </a>.
-        </p>
-
-        {saved ? (
+      <Section title="API Provider">
+        {config ? (
           <div className="space-y-3">
-            <div className="flex items-center gap-3 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg px-3 py-2.5">
-              <span className="text-xs font-mono text-emerald-400 flex-1">{saved}</span>
-              <span className="text-[10px] text-emerald-500 font-medium">Active</span>
+            <div className="bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg px-3 py-2.5 space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                  {config.provider === 'anthropic' ? 'Anthropic (Claude)' : (activePreset?.label ?? 'Custom')}
+                </span>
+                <span className="text-[10px] text-emerald-500 font-medium">Active</span>
+              </div>
+              <div className="text-xs font-mono text-emerald-400">{maskKey(config.apiKey)}</div>
+              {config.provider === 'openai-compatible' && (
+                <div className="text-[10px] text-slate-400 truncate">{config.endpoint} · {config.model}</div>
+              )}
             </div>
             <button onClick={handleClear} className="btn-secondary w-full text-xs text-red-400 border-red-500/20 hover:border-red-500/40">
-              Remove key
+              Remove
             </button>
           </div>
         ) : (
-          <div className="space-y-2">
-            <input
-              type="password"
-              value={input}
-              onChange={e => { setInput(e.target.value); setError('') }}
-              onKeyDown={e => e.key === 'Enter' && handleSave()}
-              placeholder="sk-ant-api03-..."
-              className="input-base w-full font-mono"
-              autoComplete="off"
-              spellCheck={false}
-            />
+          <div className="space-y-3">
+            {/* Provider toggle */}
+            <div className="flex rounded-lg border border-slate-200 dark:border-white/10 overflow-hidden text-xs font-medium">
+              {(['anthropic', 'openai-compatible'] as const).map(p => (
+                <button
+                  key={p}
+                  onClick={() => { setProvider(p); setError('') }}
+                  className={[
+                    'flex-1 py-2 transition-colors',
+                    provider === p
+                      ? 'bg-indigo-500 text-white'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200',
+                  ].join(' ')}
+                >
+                  {p === 'anthropic' ? 'Anthropic' : 'OpenAI-compatible'}
+                </button>
+              ))}
+            </div>
+
+            {provider === 'anthropic' ? (
+              <div className="space-y-1.5">
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Get a key at{' '}
+                  <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer" className="text-indigo-400 hover:text-indigo-300 underline">
+                    console.anthropic.com
+                  </a>. Stored locally — never sent anywhere except Anthropic.
+                </p>
+                <input
+                  type="password"
+                  value={keyInput}
+                  onChange={e => { setKeyInput(e.target.value); setError('') }}
+                  onKeyDown={e => e.key === 'Enter' && handleSave()}
+                  placeholder="sk-ant-api03-..."
+                  className="input-base w-full font-mono"
+                  autoComplete="off" spellCheck={false}
+                />
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {/* Preset selector */}
+                <div>
+                  <label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider">Provider preset</label>
+                  <div className="grid grid-cols-4 gap-1">
+                    {PRESETS.map((p, i) => (
+                      <button
+                        key={p.label}
+                        onClick={() => handlePresetChange(i)}
+                        className={[
+                          'text-xs py-1.5 rounded-lg border transition-colors',
+                          preset === i
+                            ? 'bg-indigo-500/15 border-indigo-500/40 text-indigo-400'
+                            : 'border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:border-indigo-500/30',
+                        ].join(' ')}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider">Endpoint URL</label>
+                  <input
+                    type="text"
+                    value={endpoint}
+                    onChange={e => setEndpoint(e.target.value)}
+                    placeholder="https://api.openai.com/v1"
+                    className="input-base w-full font-mono text-[11px]"
+                    spellCheck={false}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider">Model</label>
+                  <input
+                    type="text"
+                    value={model}
+                    onChange={e => setModel(e.target.value)}
+                    placeholder={PRESETS[preset].modelDefault || 'e.g. gpt-4o-mini'}
+                    className="input-base w-full font-mono text-[11px]"
+                    spellCheck={false}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider">API Key</label>
+                  {PRESETS[preset].docsUrl && (
+                    <p className="text-[10px] text-slate-500 mb-1">
+                      Get one at{' '}
+                      <a href={PRESETS[preset].docsUrl} target="_blank" rel="noreferrer" className="text-indigo-400 hover:text-indigo-300 underline">
+                        {PRESETS[preset].label}
+                      </a>
+                    </p>
+                  )}
+                  <input
+                    type="password"
+                    value={keyInput}
+                    onChange={e => { setKeyInput(e.target.value); setError('') }}
+                    onKeyDown={e => e.key === 'Enter' && handleSave()}
+                    placeholder={PRESETS[preset].keyPrefix ? `${PRESETS[preset].keyPrefix}...` : 'API key'}
+                    className="input-base w-full font-mono"
+                    autoComplete="off" spellCheck={false}
+                  />
+                </div>
+              </div>
+            )}
+
             {error && <p className="text-xs text-red-400">{error}</p>}
             <button
               onClick={handleSave}
-              disabled={!input.trim() || status === 'saving'}
+              disabled={!keyInput.trim() || status === 'saving'}
               className="btn-primary w-full"
             >
-              {status === 'saving' ? 'Saving...' : status === 'saved' ? 'Saved!' : 'Save API key'}
+              {status === 'saving' ? 'Saving...' : status === 'saved' ? 'Saved!' : 'Save'}
             </button>
           </div>
         )}
@@ -93,21 +227,17 @@ export default function SettingsTab() {
 
       <Section title="Models">
         <div className="space-y-2 text-xs">
-          <ModelRow
-            label="Fit analysis, resume parsing"
-            model="claude-haiku-4-5"
-            note="Fast + cheap"
-          />
-          <ModelRow
-            label="CV + cover letter generation"
-            model="claude-sonnet-4-5"
-            note="Higher quality"
-          />
-          <ModelRow
-            label="Chat refinement"
-            model="claude-haiku-4-5"
-            note="Fast + cheap"
-          />
+          {config?.provider === 'openai-compatible' ? (
+            <p className="text-slate-400 leading-relaxed">
+              Using <span className="font-mono text-indigo-400">{config.model || '—'}</span> for all tasks via {activePreset?.label ?? 'custom endpoint'}.
+            </p>
+          ) : (
+            <>
+              <ModelRow label="Fit analysis, resume parsing, scraping" model="claude-haiku-4-5" note="Fast + cheap" />
+              <ModelRow label="CV + cover letter generation"           model="claude-sonnet-4-5" note="Higher quality" />
+              <ModelRow label="Chat refinement"                        model="claude-haiku-4-5"  note="Fast + cheap" />
+            </>
+          )}
         </div>
       </Section>
 
