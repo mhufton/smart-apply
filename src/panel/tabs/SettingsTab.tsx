@@ -105,8 +105,8 @@ export default function SettingsTab() {
           />
           <ModelRow
             label="Chat refinement"
-            model="claude-sonnet-4-5"
-            note="Higher quality"
+            model="claude-haiku-4-5"
+            note="Fast + cheap"
           />
         </div>
       </Section>
