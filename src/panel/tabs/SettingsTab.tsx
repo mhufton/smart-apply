@@ -2,11 +2,11 @@ import { useState, useEffect } from 'react'
 import { getProviderConfig, saveProviderConfig, clearProviderConfig } from '../lib/claude'
 import type { ProviderConfig } from '../lib/claude'
 
-const PRESETS: { label: string; endpoint: string; keyPrefix: string; modelDefault: string; docsUrl: string }[] = [
-  { label: 'OpenAI',      endpoint: 'https://api.openai.com/v1',       keyPrefix: 'sk-',    modelDefault: 'gpt-4o-mini',                  docsUrl: 'https://platform.openai.com/api-keys' },
-  { label: 'Groq',        endpoint: 'https://api.groq.com/openai/v1',  keyPrefix: 'gsk_',   modelDefault: 'llama-3.3-70b-versatile',       docsUrl: 'https://console.groq.com/keys' },
-  { label: 'OpenRouter',  endpoint: 'https://openrouter.ai/api/v1',    keyPrefix: 'sk-or-', modelDefault: 'anthropic/claude-haiku-3-5',    docsUrl: 'https://openrouter.ai/keys' },
-  { label: 'Custom',      endpoint: '',                                  keyPrefix: '',       modelDefault: '',                              docsUrl: '' },
+const PRESETS: { label: string; endpoint: string; keyPrefix: string; smallModel: string; largeModel: string; docsUrl: string }[] = [
+  { label: 'OpenAI',     endpoint: 'https://api.openai.com/v1',      keyPrefix: 'sk-',    smallModel: 'gpt-4o-mini',                largeModel: 'gpt-4o',                         docsUrl: 'https://platform.openai.com/api-keys' },
+  { label: 'Groq',       endpoint: 'https://api.groq.com/openai/v1', keyPrefix: 'gsk_',   smallModel: 'llama-3.1-8b-instant',       largeModel: 'llama-3.3-70b-versatile',        docsUrl: 'https://console.groq.com/keys' },
+  { label: 'OpenRouter', endpoint: 'https://openrouter.ai/api/v1',   keyPrefix: 'sk-or-', smallModel: 'anthropic/claude-haiku-3-5', largeModel: 'anthropic/claude-sonnet-4-5',    docsUrl: 'https://openrouter.ai/keys' },
+  { label: 'Custom',     endpoint: '',                                keyPrefix: '',       smallModel: '',                           largeModel: '',                                docsUrl: '' },
 ]
 
 export default function SettingsTab() {
@@ -15,7 +15,8 @@ export default function SettingsTab() {
   const [preset, setPreset] = useState(0)
   const [keyInput, setKeyInput] = useState('')
   const [endpoint, setEndpoint] = useState('')
-  const [model, setModel] = useState('')
+  const [smallModel, setSmallModel] = useState('')
+  const [largeModel, setLargeModel] = useState('')
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [error, setError] = useState('')
 
@@ -26,7 +27,8 @@ export default function SettingsTab() {
       setProvider(cfg.provider)
       if (cfg.provider === 'openai-compatible') {
         setEndpoint(cfg.endpoint)
-        setModel(cfg.model)
+        setSmallModel(cfg.smallModel)
+        setLargeModel(cfg.largeModel)
         const idx = PRESETS.findIndex(p => p.endpoint === cfg.endpoint)
         setPreset(idx >= 0 ? idx : 3)
       }
@@ -36,7 +38,8 @@ export default function SettingsTab() {
   function handlePresetChange(idx: number) {
     setPreset(idx)
     setEndpoint(PRESETS[idx].endpoint)
-    if (!model) setModel(PRESETS[idx].modelDefault)
+    if (!smallModel) setSmallModel(PRESETS[idx].smallModel)
+    if (!largeModel) setLargeModel(PRESETS[idx].largeModel)
   }
 
   async function handleSave() {
@@ -59,7 +62,8 @@ export default function SettingsTab() {
         provider,
         apiKey: key,
         endpoint: provider === 'openai-compatible' ? endpoint.trim() : '',
-        model: provider === 'openai-compatible' ? (model.trim() || PRESETS[preset].modelDefault) : '',
+        smallModel: provider === 'openai-compatible' ? (smallModel.trim() || PRESETS[preset].smallModel) : '',
+        largeModel: provider === 'openai-compatible' ? (largeModel.trim() || PRESETS[preset].largeModel) : '',
       })
       const cfg = await getProviderConfig()
       setConfig(cfg)
@@ -98,7 +102,7 @@ export default function SettingsTab() {
               </div>
               <div className="text-xs font-mono text-emerald-400">{maskKey(config.apiKey)}</div>
               {config.provider === 'openai-compatible' && (
-                <div className="text-[10px] text-slate-400 truncate">{config.endpoint} · {config.model}</div>
+                <div className="text-[10px] text-slate-400 truncate">{config.endpoint} · {config.smallModel} / {config.largeModel}</div>
               )}
             </div>
             <button onClick={handleClear} className="btn-secondary w-full text-xs text-red-400 border-red-500/20 hover:border-red-500/40">
@@ -179,12 +183,23 @@ export default function SettingsTab() {
                 </div>
 
                 <div>
-                  <label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider">Model</label>
+                  <label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider">Small model <span className="normal-case text-slate-500">(parsing, fit, chat)</span></label>
                   <input
                     type="text"
-                    value={model}
-                    onChange={e => setModel(e.target.value)}
-                    placeholder={PRESETS[preset].modelDefault || 'e.g. gpt-4o-mini'}
+                    value={smallModel}
+                    onChange={e => setSmallModel(e.target.value)}
+                    placeholder={PRESETS[preset].smallModel || 'e.g. gpt-4o-mini'}
+                    className="input-base w-full font-mono text-[11px]"
+                    spellCheck={false}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider">Large model <span className="normal-case text-slate-500">(CV + cover letter)</span></label>
+                  <input
+                    type="text"
+                    value={largeModel}
+                    onChange={e => setLargeModel(e.target.value)}
+                    placeholder={PRESETS[preset].largeModel || 'e.g. gpt-4o'}
                     className="input-base w-full font-mono text-[11px]"
                     spellCheck={false}
                   />
@@ -228,14 +243,15 @@ export default function SettingsTab() {
       <Section title="Models">
         <div className="space-y-2 text-xs">
           {config?.provider === 'openai-compatible' ? (
-            <p className="text-slate-400 leading-relaxed">
-              Using <span className="font-mono text-indigo-400">{config.model || '—'}</span> for all tasks via {activePreset?.label ?? 'custom endpoint'}.
-            </p>
+            <>
+              <ModelRow label="Fit analysis, parsing, chat" model={config.smallModel || '—'} note="Small" />
+              <ModelRow label="CV + cover letter"           model={config.largeModel  || '—'} note="Large" />
+            </>
           ) : (
             <>
-              <ModelRow label="Fit analysis, resume parsing, scraping" model="claude-haiku-4-5" note="Fast + cheap" />
-              <ModelRow label="CV + cover letter generation"           model="claude-sonnet-4-5" note="Higher quality" />
-              <ModelRow label="Chat refinement"                        model="claude-haiku-4-5"  note="Fast + cheap" />
+              <ModelRow label="Fit analysis, resume parsing, scraping" model="claude-haiku-4-5"  note="Small" />
+              <ModelRow label="CV + cover letter generation"           model="claude-sonnet-4-5" note="Large" />
+              <ModelRow label="Chat refinement"                        model="claude-haiku-4-5"  note="Small" />
             </>
           )}
         </div>

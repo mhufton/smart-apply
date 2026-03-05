@@ -7,8 +7,9 @@ export type Provider = 'anthropic' | 'openai-compatible'
 export interface ProviderConfig {
   provider: Provider
   apiKey: string
-  endpoint: string  // base URL — only used for openai-compatible
-  model: string     // model for all calls — only used for openai-compatible
+  endpoint: string    // base URL — only used for openai-compatible
+  smallModel: string  // fast/cheap model (parsing, fit analysis, chat)
+  largeModel: string  // quality model (CV + cover letter generation)
 }
 
 const CONFIG_KEY = 'providerConfig'
@@ -19,7 +20,7 @@ export async function getProviderConfig(): Promise<ProviderConfig | null> {
   if (result[CONFIG_KEY]) return result[CONFIG_KEY] as ProviderConfig
   // Backward compat: migrate old anthropicApiKey
   if (result[LEGACY_KEY]) {
-    return { provider: 'anthropic', apiKey: result[LEGACY_KEY], endpoint: '', model: '' }
+    return { provider: 'anthropic', apiKey: result[LEGACY_KEY], endpoint: '', smallModel: '', largeModel: '' }
   }
   return null
 }
@@ -38,7 +39,7 @@ export async function getApiKey(): Promise<string | null> {
   return config?.apiKey ?? null
 }
 export async function saveApiKey(key: string): Promise<void> {
-  await saveProviderConfig({ provider: 'anthropic', apiKey: key, endpoint: '', model: '' })
+  await saveProviderConfig({ provider: 'anthropic', apiKey: key, endpoint: '', smallModel: '', largeModel: '' })
 }
 export async function clearApiKey(): Promise<void> {
   await clearProviderConfig()
@@ -128,8 +129,11 @@ async function readSSE(response: Response, onEvent: (json: any) => void): Promis
   }
 }
 
+const ANTHROPIC_SMALL = 'claude-haiku-4-5-20251001'
+const ANTHROPIC_LARGE = 'claude-sonnet-4-5'
+
 async function stream(
-  anthropicModel: string,
+  tier: 'small' | 'large',
   messages: ApiMessage[],
   onChunk: (text: string) => void,
   maxTokens: number
@@ -139,32 +143,39 @@ async function stream(
 
   if (config.provider === 'openai-compatible') {
     if (!config.endpoint) throw new Error('No endpoint set. Configure it in the Settings tab.')
-    return streamOpenAICompat(config.model || anthropicModel, messages, config.apiKey, config.endpoint, onChunk, maxTokens)
+    const model = tier === 'small'
+      ? (config.smallModel || config.largeModel)
+      : (config.largeModel || config.smallModel)
+    if (!model) throw new Error('No model set. Configure it in the Settings tab.')
+    return streamOpenAICompat(model, messages, config.apiKey, config.endpoint, onChunk, maxTokens)
   }
 
-  return streamAnthropic(anthropicModel, messages, config.apiKey, onChunk, maxTokens)
+  const model = tier === 'small' ? ANTHROPIC_SMALL : ANTHROPIC_LARGE
+  return streamAnthropic(model, messages, config.apiKey, onChunk, maxTokens)
 }
 
 // ── Model callers ─────────────────────────────────────────────────────────────
 
-// Haiku — fast, cheap. Used for fit analysis, resume parsing, scraping tasks.
-export async function callHaiku(
+// Small — fast, cheap. Used for fit analysis, resume parsing, scraping, chat.
+export async function callSmall(
   messages: ApiMessage[],
   onChunk: (text: string) => void
 ): Promise<void> {
-  return stream('claude-haiku-4-5-20251001', messages, onChunk, 4096)
+  return stream('small', messages, onChunk, 4096)
 }
 
-// Sonnet — smarter. Used for CV + cover letter generation and chat.
-export async function callSonnet(
+// Large — higher quality. Used for CV + cover letter generation.
+export async function callLarge(
   messages: ApiMessage[],
   onChunk: (text: string) => void
 ): Promise<void> {
-  return stream('claude-sonnet-4-5', messages, onChunk, 8192)
+  return stream('large', messages, onChunk, 8192)
 }
 
-// Legacy alias — points to Haiku.
-export const callClaude = callHaiku
+// Legacy aliases
+export const callHaiku = callSmall
+export const callSonnet = callLarge
+export const callClaude = callSmall
 
 // ── Prompts ───────────────────────────────────────────────────────────────────
 
