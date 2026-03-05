@@ -24,6 +24,8 @@ export default function DocumentsTab({ docs, job, generating, onDocsChange, onOp
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [lastName, setLastName] = useState('')
+  const [historyPage, setHistoryPage] = useState<Record<'cv' | 'coverLetter', number>>({ cv: 0, coverLetter: 0 })
+  const PAGE_SIZE = 5
 
   useEffect(() => {
     loadDocHistory().then(setHistory)
@@ -168,37 +170,51 @@ export default function DocumentsTab({ docs, job, generating, onDocsChange, onOp
               {(['cv', 'coverLetter'] as const).map(field => {
                 const entries = history.filter(e => e[field])
                 const label = field === 'cv' ? 'CVs' : 'Cover Letters'
+                const page = historyPage[field]
+                const totalPages = Math.ceil(entries.length / PAGE_SIZE)
+                const visible = entries.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
                 return (
                   <div key={field}>
                     <h3 className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">{label}</h3>
                     {entries.length === 0 ? (
                       <p className="text-xs text-slate-400 dark:text-slate-600">No {label.toLowerCase()} saved yet.</p>
                     ) : (
-                      <div className="space-y-1.5">
-                        {entries.map(entry => (
-                          <div key={entry.id} className="flex items-center gap-2 bg-black/[0.02] dark:bg-white/[0.03] border border-slate-200 dark:border-white/5 rounded-lg px-3 py-2">
-                            <div className="flex-1 min-w-0">
-                              <p className="text-xs font-medium text-slate-700 dark:text-slate-300 truncate">{entry.jobTitle || 'Untitled'}</p>
-                              <p className="text-[10px] text-slate-400 dark:text-slate-600">{entry.jobCompany} · {formatDate(entry.generatedAt)}</p>
+                      <>
+                        <div className="space-y-1.5">
+                          {visible.map(entry => (
+                            <div key={entry.id} className="flex items-center gap-2 bg-black/[0.02] dark:bg-white/[0.03] border border-slate-200 dark:border-white/5 rounded-lg px-3 py-2">
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-medium text-slate-700 dark:text-slate-300 truncate">{entry.jobTitle || 'Untitled'}</p>
+                                <p className="text-[10px] text-slate-400 dark:text-slate-600">{entry.jobCompany} · {formatDate(entry.generatedAt)}</p>
+                              </div>
+                              <button onClick={() => setHistoryPreview({ entry, field })} className="btn-ghost text-[10px] px-2 py-1">View</button>
+                              <button onClick={() => exportToPdf(entry[field], field === 'cv' ? 'CV' : 'Cover-Letter', lastName, entry.jobCompany)} className="btn-ghost text-[10px] px-2 py-1">PDF</button>
+                              <button
+                                onClick={async () => {
+                                  await deleteDocHistoryEntry(entry.id)
+                                  setHistory(h => h.filter(e => e.id !== entry.id))
+                                }}
+                                className="text-[10px] text-red-400 hover:text-red-300 px-2 py-1"
+                              >✕</button>
                             </div>
+                          ))}
+                        </div>
+                        {totalPages > 1 && (
+                          <div className="flex items-center justify-between mt-2">
                             <button
-                              onClick={() => setHistoryPreview({ entry, field })}
-                              className="btn-ghost text-[10px] px-2 py-1"
-                            >View</button>
+                              onClick={() => setHistoryPage(p => ({ ...p, [field]: Math.max(0, p[field] - 1) }))}
+                              disabled={page === 0}
+                              className="text-[10px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 disabled:opacity-30 px-1"
+                            >← Prev</button>
+                            <span className="text-[10px] text-slate-400">{page + 1} / {totalPages}</span>
                             <button
-                              onClick={() => exportToPdf(entry[field], field === 'cv' ? 'CV' : 'Cover-Letter', lastName, entry.jobCompany)}
-                              className="btn-ghost text-[10px] px-2 py-1"
-                            >PDF</button>
-                            <button
-                              onClick={async () => {
-                                await deleteDocHistoryEntry(entry.id)
-                                setHistory(h => h.filter(e => e.id !== entry.id))
-                              }}
-                              className="text-[10px] text-red-400 hover:text-red-300 px-2 py-1"
-                            >✕</button>
+                              onClick={() => setHistoryPage(p => ({ ...p, [field]: Math.min(totalPages - 1, p[field] + 1) }))}
+                              disabled={page >= totalPages - 1}
+                              className="text-[10px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 disabled:opacity-30 px-1"
+                            >Next →</button>
                           </div>
-                        ))}
-                      </div>
+                        )}
+                      </>
                     )}
                   </div>
                 )
@@ -247,12 +263,14 @@ export default function DocumentsTab({ docs, job, generating, onDocsChange, onOp
           </div>
         )}
 
-        {/* Generating overlay — shown while streaming */}
-        {generating && activeDoc && (
+        {/* Top-right overlays */}
+        {generating && activeDoc ? (
           <div className="absolute top-3 right-3 flex items-center gap-1.5 bg-indigo-600/90 text-white text-[10px] rounded-full px-2.5 py-1 shadow-lg">
             <Spinner className="w-2.5 h-2.5" />
             Writing…
           </div>
+        ) : activeDoc && (
+          <CopyButton text={activeDoc} />
         )}
       </div>}
 
@@ -289,6 +307,26 @@ export default function DocumentsTab({ docs, job, generating, onDocsChange, onOp
         </div>
       )}
     </div>
+  )
+}
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false)
+  function handleCopy() {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }).catch(console.error)
+  }
+  return (
+    <button
+      onClick={handleCopy}
+      className="absolute top-3 right-3 text-[10px] px-2.5 py-1 rounded-full shadow-sm transition-colors
+                 bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10
+                 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+    >
+      {copied ? '✓ Copied' : 'Copy'}
+    </button>
   )
 }
 

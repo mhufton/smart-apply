@@ -296,7 +296,7 @@ export function buildDocsPrompt(
 Produce only a CV:
 
 ## CV
-[Tailored CV in clean markdown. Use ## for section headings, bullet points for experience. Hard limit: 1–2 pages. Max 3 bullets per role. Omit roles older than 10 years unless exceptional. No filler, no objectives section, no "References available on request".]
+[Tailored CV in clean markdown. Use ## for section headings, bullet points for experience. Hard limit: 1–2 pages. Max 3 bullets per role. Omit roles older than 10 years unless exceptional. No filler, no objectives section, no "References available on request". Do not use blank lines between bullet points or between roles — no extra line breaks anywhere in the CV.]
 
 Do not include a cover letter or any other text.`
       : mode === 'cover-letter'
@@ -311,7 +311,7 @@ Do not include a CV or any other text.`
 Produce two sections separated exactly as shown:
 
 ## CV
-[Tailored CV in clean markdown. Use ## for section headings, bullet points for experience. Hard limit: 1–2 pages. Max 3 bullets per role. Omit roles older than 10 years unless exceptional. No filler, no objectives section, no "References available on request".]
+[Tailored CV in clean markdown. Use ## for section headings, bullet points for experience. Hard limit: 1–2 pages. Max 3 bullets per role. Omit roles older than 10 years unless exceptional. No filler, no objectives section, no "References available on request". Do not use blank lines between bullet points or between roles — no extra line breaks anywhere in the CV.]
 
 ## Cover Letter
 [3 paragraphs max. Professional but not stiff. Don't start with "I am writing to apply for". No more than 350 words.]
@@ -386,6 +386,7 @@ Return ONLY valid JSON — no markdown fencing, no explanation:
   "title": "exact job title",
   "company": "company name",
   "location": "location or 'Remote'",
+  "salary": "salary or compensation range if mentioned, otherwise empty string",
   "description": "full job description text, preserving requirements and responsibilities"
 }
 

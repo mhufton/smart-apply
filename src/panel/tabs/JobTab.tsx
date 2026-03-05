@@ -48,6 +48,7 @@ export default function JobTab({ job, fit, onJobScraped, onFitAnalyzed, onGenera
             job.title       = parsed.title       || job.title
             job.company     = parsed.company     || job.company
             job.location    = parsed.location    || job.location
+            job.salary      = parsed.salary      || job.salary
             job.description = parsed.description || job.description
           }
         } catch { /* keep whatever fields exist */ }
@@ -132,6 +133,7 @@ export default function JobTab({ job, fit, onJobScraped, onFitAnalyzed, onGenera
               <Field label="Title" value={job.title} />
               <Field label="Company" value={job.company} />
               <Field label="Location" value={job.location} />
+              <Field label="Salary" value={job.salary ?? ''} />
               <Field label="Platform" value={job.platform} />
               <Field label="Form fields detected" value={String((job.formFields ?? []).length)} />
               {job.description && (

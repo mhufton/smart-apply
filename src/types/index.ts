@@ -60,6 +60,7 @@ export interface ScrapedJob {
   title: string
   company: string
   location: string
+  salary?: string
   description: string
   platform: 'greenhouse' | 'lever' | 'workday' | 'linkedin' | 'indeed' | 'amazon' | 'unknown'
   url: string

@@ -9,7 +9,10 @@ export default function ErrorBanner({ error, onDismiss, onAction }: Props) {
   return (
     <div className="mx-4 mt-3 flex items-start gap-2 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2.5 text-xs text-red-600 dark:text-red-300">
       <span className="shrink-0 mt-0.5">⚠</span>
-      <span className="flex-1 leading-relaxed">{error}</span>
+      <span className="flex-1 leading-relaxed">
+        {error}
+        <span className="block text-[10px] opacity-70 mt-0.5">Try refreshing the page — this often clears things up.</span>
+      </span>
       {onAction && (
         <button
           onClick={onAction.onClick}
