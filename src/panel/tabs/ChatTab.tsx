@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import type { ChatMessage, GeneratedDocuments, ScrapedJob } from '../../types'
-import { callClaude } from '../lib/claude'
+import { callHaiku } from '../lib/claude'
 
 interface Props {
   messages: ChatMessage[]
@@ -73,7 +73,7 @@ export default function ChatTab({ messages, docs, job, onMessagesChange, onDocsU
       ]
 
       let fullResponse = ''
-      await callClaude(apiMessages, (chunk) => {
+      await callHaiku(apiMessages, (chunk) => {
         fullResponse += chunk
         onMessagesChange(
           newMessages.map(m =>
