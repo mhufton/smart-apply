@@ -13,7 +13,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'profile',   label: 'Profile'  },
   { id: 'documents', label: 'Docs'     },
   { id: 'chat',      label: 'Chat'     },
-  { id: 'settings',  label: '⚙'        },
+  { id: 'settings',  label: 'Settings'  },
 ]
 
 export default function App() {
