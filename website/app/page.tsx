@@ -44,6 +44,12 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-[#0f1117] text-slate-200">
 
+      {/* WIP banner */}
+      <div className="bg-amber-500/10 border-b border-amber-500/20 text-amber-400 text-xs text-center py-2 px-4">
+        Smart Apply is a work in progress — expect rough edges. Feedback welcome on{" "}
+        <a href="https://github.com/mhufton/smart-apply/issues" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-amber-300">GitHub</a>.
+      </div>
+
       {/* Nav */}
       <nav className="border-b border-white/5 bg-[#16181f]/80 backdrop-blur sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
@@ -60,14 +66,14 @@ export default function Home() {
       <section className="max-w-5xl mx-auto px-6 pt-24 pb-20 text-center">
         <div className="inline-flex items-center gap-2 text-xs text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 rounded-full px-3 py-1 mb-8">
           <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
-          Bring your own Anthropic API key — no subscription
+          Bring your own API key — ~5 cents per application, no subscription
         </div>
         <h1 className="text-4xl sm:text-5xl font-bold text-white tracking-tight leading-tight mb-5">
           Job applications that<br />
           <span className="text-indigo-400">actually fit the role</span>
         </h1>
         <p className="text-slate-400 text-lg max-w-xl mx-auto mb-10 leading-relaxed">
-          Smart Apply is a Chrome extension that scrapes job postings, analyses your fit, and writes tailored CVs and cover letters — all without leaving your browser.
+          Smart Apply is a Chrome extension that does the research and drafting for you — then keeps you in the loop before anything goes out. Not a bot. Not a blank page. Something better.
         </p>
         <div className="flex items-center justify-center gap-4 flex-wrap">
           <a
@@ -84,6 +90,24 @@ export default function Home() {
           >
             View source
           </a>
+        </div>
+      </section>
+
+      {/* Philosophy */}
+      <section className="max-w-5xl mx-auto px-6 pb-20">
+        <div className="grid sm:grid-cols-3 gap-px bg-white/5 rounded-2xl overflow-hidden border border-white/5">
+          <div className="bg-[#0f1117] p-6">
+            <p className="text-xs font-semibold text-red-400 uppercase tracking-widest mb-3">The spray-and-pray approach</p>
+            <p className="text-xs text-slate-500 leading-relaxed">AI blasts out hundreds of generic applications in your name. Recruiters spot it instantly. Your reputation takes the hit.</p>
+          </div>
+          <div className="bg-indigo-500/5 p-6 border-x border-white/5">
+            <p className="text-xs font-semibold text-indigo-400 uppercase tracking-widest mb-3">The Smart Apply approach</p>
+            <p className="text-xs text-slate-300 leading-relaxed">AI does the research and drafting. You review, refine, and decide what goes out. Every application is deliberate and genuinely tailored.</p>
+          </div>
+          <div className="bg-[#0f1117] p-6">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3">The fully manual approach</p>
+            <p className="text-xs text-slate-500 leading-relaxed">Hours rewriting the same CV for each role. Inconsistent quality, hard to maintain, and exhausting at scale.</p>
+          </div>
         </div>
       </section>
 
@@ -131,6 +155,7 @@ export default function Home() {
             <span>✓ No server</span>
             <span>✓ No tracking</span>
             <span>✓ Open source</span>
+            <span>✓ ~5 cents per application</span>
           </div>
         </div>
       </section>
