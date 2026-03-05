@@ -1,4 +1,7 @@
 import type { MasterProfile, DocHistoryEntry } from '../../types'
+import { db } from './db'
+
+// ── Defaults ──────────────────────────────────────────────────────────────────
 
 const DEFAULT_PROFILE: MasterProfile = {
   basics: {
@@ -16,40 +19,54 @@ const DEFAULT_PROFILE: MasterProfile = {
   contextNotes: [],
 }
 
+// ── Profile ───────────────────────────────────────────────────────────────────
+
 export async function loadProfile(): Promise<MasterProfile> {
-  const result = await chrome.storage.local.get('masterProfile')
-  const stored = result.masterProfile
-  if (!stored) return DEFAULT_PROFILE
+  const row = await db.profile.get(1)
+  if (!row) return DEFAULT_PROFILE
+  const stored = row.data
   return {
     ...DEFAULT_PROFILE,
     ...stored,
     basics: { ...DEFAULT_PROFILE.basics, ...stored.basics },
-    experiences: stored.experiences ?? [],
-    skills: stored.skills ?? [],
-    projects: stored.projects ?? [],
-    education: stored.education ?? [],
+    experiences:  stored.experiences  ?? [],
+    skills:       stored.skills       ?? [],
+    projects:     stored.projects     ?? [],
+    education:    stored.education    ?? [],
     contextNotes: stored.contextNotes ?? [],
   }
 }
 
 export async function saveProfile(profile: MasterProfile): Promise<void> {
-  await chrome.storage.local.set({ masterProfile: profile })
+  await db.profile.put({ id: 1, data: profile })
 }
+
+// ── Document history ──────────────────────────────────────────────────────────
 
 const MAX_HISTORY = 50
 
 export async function loadDocHistory(): Promise<DocHistoryEntry[]> {
-  const result = await chrome.storage.local.get('docHistory')
-  return result.docHistory ?? []
+  return db.docHistory
+    .orderBy('generatedAt')
+    .reverse()
+    .limit(MAX_HISTORY)
+    .toArray()
 }
 
 export async function appendDocHistory(entry: DocHistoryEntry): Promise<void> {
-  const history = await loadDocHistory()
-  const updated = [entry, ...history].slice(0, MAX_HISTORY)
-  await chrome.storage.local.set({ docHistory: updated })
+  await db.docHistory.put(entry)
+
+  // Prune if over limit (keep newest)
+  const count = await db.docHistory.count()
+  if (count > MAX_HISTORY) {
+    const oldest = await db.docHistory
+      .orderBy('generatedAt')
+      .limit(count - MAX_HISTORY)
+      .primaryKeys()
+    await db.docHistory.bulkDelete(oldest as string[])
+  }
 }
 
 export async function deleteDocHistoryEntry(id: string): Promise<void> {
-  const history = await loadDocHistory()
-  await chrome.storage.local.set({ docHistory: history.filter(e => e.id !== id) })
+  await db.docHistory.delete(id)
 }
