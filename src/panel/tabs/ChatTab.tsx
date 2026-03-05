@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import type { ChatMessage, GeneratedDocuments, ScrapedJob } from '../../types'
 import { callHaiku } from '../lib/claude'
+import ErrorBanner from '../components/ErrorBanner'
 
 interface Props {
   messages: ChatMessage[]
@@ -13,6 +14,7 @@ interface Props {
 export default function ChatTab({ messages, docs, job, onMessagesChange, onDocsUpdated }: Props) {
   const [input, setInput] = useState('')
   const [streaming, setStreaming] = useState(false)
+  const [error, setError] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -91,6 +93,10 @@ export default function ChatTab({ messages, docs, job, onMessagesChange, onDocsU
         if (clMatch) updatedDocs.coverLetter = clMatch[1]
         if (cvMatch || clMatch) onDocsUpdated(updatedDocs)
       }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Something went wrong.')
+      // Remove the empty assistant bubble on error
+      onMessagesChange(newMessages.filter(m => m.id !== assistantMsg.id))
     } finally {
       setStreaming(false)
     }
@@ -109,6 +115,7 @@ export default function ChatTab({ messages, docs, job, onMessagesChange, onDocsU
 
   return (
     <div className="h-full flex flex-col">
+      <ErrorBanner error={error} onDismiss={() => setError('')} />
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {messages.length === 0 && (

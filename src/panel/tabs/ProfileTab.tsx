@@ -88,7 +88,7 @@ export default function ProfileTab() {
         setResumeText('')
       }
     } catch (e) {
-      setError('Failed to parse resume. Check that your LLM endpoint is running.')
+      setError(e instanceof Error ? e.message : 'Failed to parse resume.')
       console.error('[Smart Apply] Resume parse failed:', e)
     } finally {
       setParsing(false)

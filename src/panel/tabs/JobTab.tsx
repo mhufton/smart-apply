@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { ScrapedJob, FitAnalysis, GeneratedDocuments } from '../../types'
 import { callHaiku, callSonnet, buildFitPrompt, buildDocsPrompt } from '../lib/claude'
 import { loadProfile } from '../lib/storage'
+import ErrorBanner from '../components/ErrorBanner'
 
 interface Props {
   job: ScrapedJob | null
@@ -17,6 +18,7 @@ export default function JobTab({ job, fit, onJobScraped, onFitAnalyzed, onGenera
   const [generating, setGenerating] = useState(false)
   const [activeAngles, setActiveAngles] = useState<string[]>([])
   const [customContext, setCustomContext] = useState('')
+  const [error, setError] = useState('')
 
   async function handleScrape() {
     setScraping(true)
@@ -35,6 +37,7 @@ export default function JobTab({ job, fit, onJobScraped, onFitAnalyzed, onGenera
   async function handleAnalyzeFit() {
     if (!job) return
     setAnalyzing(true)
+    setError('')
     try {
       const profile = await loadProfile()
       const prompt = buildFitPrompt(job, profile)
@@ -42,6 +45,8 @@ export default function JobTab({ job, fit, onJobScraped, onFitAnalyzed, onGenera
       await callHaiku([{ role: 'user', content: prompt }], (chunk) => { raw += chunk })
       const fit = parseFitResponse(raw)
       onFitAnalyzed(fit)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Fit analysis failed.')
     } finally {
       setAnalyzing(false)
     }
@@ -50,6 +55,7 @@ export default function JobTab({ job, fit, onJobScraped, onFitAnalyzed, onGenera
   async function handleGenerateDocs() {
     if (!job) return
     setGenerating(true)
+    setError('')
     try {
       const profile = await loadProfile()
       const context = [
@@ -62,6 +68,8 @@ export default function JobTab({ job, fit, onJobScraped, onFitAnalyzed, onGenera
       await callSonnet([{ role: 'user', content: prompt }], (chunk) => { raw += chunk })
       const docs = parseDocsResponse(raw)
       onGenerateDocs(docs)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Document generation failed.')
     } finally {
       setGenerating(false)
     }
@@ -75,6 +83,7 @@ export default function JobTab({ job, fit, onJobScraped, onFitAnalyzed, onGenera
 
   return (
     <div className="h-full overflow-y-auto">
+      <ErrorBanner error={error} onDismiss={() => setError('')} />
       <div className="p-4 space-y-4">
 
         {/* Scrape */}
