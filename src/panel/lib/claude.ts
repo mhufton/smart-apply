@@ -93,11 +93,11 @@ Name: ${profile.basics.name}
 Summary: ${profile.summary}
 
 Experience:
-${profile.experiences.map(e =>
-  `- ${e.title} at ${e.company} (${e.dates})\n  Tags: ${e.tags.join(', ')}\n  ${e.bullets.slice(0,2).join(' | ')}`
+${(profile.experiences ?? []).map(e =>
+  `- ${e.title} at ${e.company} (${e.dates})\n  Tags: ${(e.tags ?? []).join(', ')}\n  ${(e.bullets ?? []).slice(0,2).join(' | ')}`
 ).join('\n')}
 
-Skills: ${profile.skills.join(', ')}
+Skills: ${(profile.skills ?? []).join(', ')}
 
 ## Job
 Title: ${job.title}
@@ -123,6 +123,53 @@ Analyze this candidate's fit for this role. Return a JSON object with this exact
 \`\`\`
 
 Be concise. Max 5 signals, 3 green flags, 3 red flags, 4 suggested angles.`
+}
+
+export function buildResumeParsePrompt(resumeText: string): string {
+  return `Parse the following resume text into a structured JSON object. Return ONLY valid JSON matching this exact shape (no markdown fencing, no explanation):
+
+{
+  "basics": {
+    "name": "string",
+    "email": "string",
+    "phone": "string",
+    "location": "string",
+    "linkedin": "string",
+    "website": "string"
+  },
+  "summary": "string",
+  "experiences": [
+    {
+      "id": "exp-1",
+      "company": "string",
+      "title": "string",
+      "dates": "string",
+      "bullets": ["string"],
+      "tags": ["string"]
+    }
+  ],
+  "skills": ["string"],
+  "projects": [
+    {
+      "id": "proj-1",
+      "name": "string",
+      "description": "string",
+      "tags": ["string"]
+    }
+  ],
+  "education": [
+    {
+      "institution": "string",
+      "degree": "string",
+      "dates": "string"
+    }
+  ]
+}
+
+Use empty strings for missing fields. Generate sequential IDs like "exp-1", "exp-2" for experiences and "proj-1", "proj-2" for projects. Extract skills as individual tags. Infer tags for experiences from bullet points.
+
+Resume text:
+${resumeText}`
 }
 
 export function buildDocsPrompt(

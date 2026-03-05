@@ -18,7 +18,18 @@ const DEFAULT_PROFILE: MasterProfile = {
 
 export async function loadProfile(): Promise<MasterProfile> {
   const result = await chrome.storage.local.get('masterProfile')
-  return result.masterProfile ?? DEFAULT_PROFILE
+  const stored = result.masterProfile
+  if (!stored) return DEFAULT_PROFILE
+  return {
+    ...DEFAULT_PROFILE,
+    ...stored,
+    basics: { ...DEFAULT_PROFILE.basics, ...stored.basics },
+    experiences: stored.experiences ?? [],
+    skills: stored.skills ?? [],
+    projects: stored.projects ?? [],
+    education: stored.education ?? [],
+    contextNotes: stored.contextNotes ?? [],
+  }
 }
 
 export async function saveProfile(profile: MasterProfile): Promise<void> {

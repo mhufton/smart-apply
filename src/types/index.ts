@@ -97,6 +97,7 @@ export interface GeneratedDocuments {
 
 export type ExtMessage =
   | { type: 'SCRAPE_JOB' }
+  | { type: 'SCRAPE_PROFILE' }
   | { type: 'INJECT_FIELDS'; payload: Record<string, string> }
 
 // ── Chat ──────────────────────────────────────────────────────────────────────

@@ -21,8 +21,12 @@ export default function JobTab({ job, fit, onJobScraped, onFitAnalyzed, onGenera
   async function handleScrape() {
     setScraping(true)
     try {
-      const job = await scrapeCurrentPage()
-      onJobScraped(job)
+      const result = await scrapeCurrentPage()
+      if ('error' in result) {
+        console.warn('[Smart Apply] Scrape failed:', result.error)
+        return
+      }
+      onJobScraped(result)
     } finally {
       setScraping(false)
     }
@@ -89,7 +93,7 @@ export default function JobTab({ job, fit, onJobScraped, onFitAnalyzed, onGenera
               <Field label="Company" value={job.company} />
               <Field label="Location" value={job.location} />
               <Field label="Platform" value={job.platform} />
-              <Field label="Form fields detected" value={String(job.formFields.length)} />
+              <Field label="Form fields detected" value={String((job.formFields ?? []).length)} />
               {job.description && (
                 <div className="mt-2">
                   <p className="text-xs text-slate-500 mb-1">Description</p>
@@ -140,10 +144,10 @@ export default function JobTab({ job, fit, onJobScraped, onFitAnalyzed, onGenera
         )}
 
         {/* Form Fields */}
-        {job && job.formFields.length > 0 && (
-          <Section title={`Form Fields (${job.formFields.length})`}>
+        {job && (job.formFields ?? []).length > 0 && (
+          <Section title={`Form Fields (${(job.formFields ?? []).length})`}>
             <div className="space-y-1">
-              {job.formFields.map((f, i) => (
+              {(job.formFields ?? []).map((f, i) => (
                 <div key={i} className="flex items-center gap-2 text-xs py-1.5 border-b border-white/5 last:border-0">
                   <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono ${fieldTypeColor(f.type)}`}>
                     {f.type}

@@ -1,4 +1,4 @@
-import type { ExtMessage, ScrapedJob, FormField } from '../types'
+import type { ExtMessage, ScrapedJob, FormField, MasterProfile } from '../types'
 
 console.log('[Smart Apply] content script loaded')
 
@@ -99,6 +99,93 @@ function scrapeJob(): ScrapedJob {
   }
 }
 
+// ── LinkedIn Profile Scraping ─────────────────────────────────────────────────
+
+function scrapeLinkedInProfile(): Partial<MasterProfile> {
+  const getText = (selector: string): string =>
+    document.querySelector<HTMLElement>(selector)?.textContent?.trim() ?? ''
+
+  const name = getText('h1') || getText('.text-heading-xlarge')
+  const headline = getText('.text-body-medium') || getText('[data-generated-suggestion-target]')
+  const profileLocation = getText('.text-body-small .inline-block') || ''
+
+  // Scrape experience section
+  const experiences: MasterProfile['experiences'] = []
+  const expSection = document.querySelector('#experience')?.closest('section')
+    ?? document.querySelector('[id*="experience"]')?.closest('section')
+  if (expSection) {
+    const items = expSection.querySelectorAll(':scope > div > ul > li')
+    items.forEach((item, i) => {
+      const titleEl = item.querySelector('.t-bold span, [class*="t-bold"] span')
+      const companyEl = item.querySelector('.t-normal span, [class*="t-normal"] span')
+      const datesEl = item.querySelector('.t-black--light span, [class*="date-range"] span')
+      const descEl = item.querySelector('.inline-show-more-text span, [class*="description"] span')
+
+      const title = titleEl?.textContent?.trim() ?? ''
+      const company = companyEl?.textContent?.trim() ?? ''
+      const dates = datesEl?.textContent?.trim() ?? ''
+      const desc = descEl?.textContent?.trim() ?? ''
+
+      if (title || company) {
+        experiences.push({
+          id: `exp-${i + 1}`,
+          company,
+          title,
+          dates,
+          bullets: desc ? desc.split('\n').map(b => b.trim()).filter(Boolean) : [],
+          tags: [],
+        })
+      }
+    })
+  }
+
+  // Scrape education section
+  const education: MasterProfile['education'] = []
+  const eduSection = document.querySelector('#education')?.closest('section')
+    ?? document.querySelector('[id*="education"]')?.closest('section')
+  if (eduSection) {
+    const items = eduSection.querySelectorAll(':scope > div > ul > li')
+    items.forEach((item) => {
+      const institution = item.querySelector('.t-bold span, [class*="t-bold"] span')?.textContent?.trim() ?? ''
+      const degree = item.querySelector('.t-normal span, [class*="t-normal"] span')?.textContent?.trim() ?? ''
+      const dates = item.querySelector('.t-black--light span, [class*="date-range"] span')?.textContent?.trim() ?? ''
+      if (institution) {
+        education.push({ institution, degree, dates })
+      }
+    })
+  }
+
+  // Scrape skills section
+  const skills: string[] = []
+  const skillsSection = document.querySelector('#skills')?.closest('section')
+    ?? document.querySelector('[id*="skills"]')?.closest('section')
+  if (skillsSection) {
+    skillsSection.querySelectorAll('.t-bold span, [class*="t-bold"] span').forEach((el) => {
+      const skill = el.textContent?.trim()
+      if (skill && !skills.includes(skill)) skills.push(skill)
+    })
+  }
+
+  // Extract LinkedIn URL
+  const linkedin = window.location.href.includes('linkedin.com/in/')
+    ? window.location.href.split('?')[0]
+    : ''
+
+  return {
+    basics: {
+      name,
+      email: '',
+      phone: '',
+      location: profileLocation,
+      linkedin,
+    },
+    summary: headline,
+    experiences,
+    education,
+    skills,
+  }
+}
+
 // ── Field Injection ───────────────────────────────────────────────────────────
 
 function injectFields(values: Record<string, string>) {
@@ -123,6 +210,11 @@ chrome.runtime.onMessage.addListener((message: ExtMessage, _sender, sendResponse
   if (message.type === 'SCRAPE_JOB') {
     const job = scrapeJob()
     sendResponse(job)
+    return false
+  }
+  if (message.type === 'SCRAPE_PROFILE') {
+    const profile = scrapeLinkedInProfile()
+    sendResponse(profile)
     return false
   }
   if (message.type === 'INJECT_FIELDS') {

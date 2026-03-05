@@ -1,13 +1,15 @@
 import { useState } from 'react'
 import type { ScrapedJob, FitAnalysis, GeneratedDocuments, ChatMessage } from '../types'
 import JobTab from './tabs/JobTab'
+import ProfileTab from './tabs/ProfileTab'
 import DocumentsTab from './tabs/DocumentsTab'
 import ChatTab from './tabs/ChatTab'
 
-type Tab = 'job' | 'documents' | 'chat'
+type Tab = 'job' | 'profile' | 'documents' | 'chat'
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'job',       label: 'Job'       },
+  { id: 'profile',   label: 'Profile'   },
   { id: 'documents', label: 'Documents' },
   { id: 'chat',      label: 'Chat'      },
 ]
@@ -58,6 +60,9 @@ export default function App() {
 
       {/* Tab content */}
       <main className="flex-1 overflow-hidden">
+        {activeTab === 'profile' && (
+          <ProfileTab />
+        )}
         {activeTab === 'job' && (
           <JobTab
             job={job}
