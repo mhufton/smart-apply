@@ -38,8 +38,8 @@ export default function SettingsTab() {
   function handlePresetChange(idx: number) {
     setPreset(idx)
     setEndpoint(PRESETS[idx].endpoint)
-    if (!smallModel) setSmallModel(PRESETS[idx].smallModel)
-    if (!largeModel) setLargeModel(PRESETS[idx].largeModel)
+    setSmallModel(PRESETS[idx].smallModel)
+    setLargeModel(PRESETS[idx].largeModel)
   }
 
   async function handleSave() {
