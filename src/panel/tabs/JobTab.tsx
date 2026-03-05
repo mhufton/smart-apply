@@ -210,8 +210,8 @@ export default function JobTab({ job, fit, onJobScraped, onFitAnalyzed, onGenera
                   <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono ${fieldTypeColor(f.type)}`}>
                     {f.type}
                   </span>
-                  <span className="text-slate-300 truncate flex-1">{f.label || f.name || f.id}</span>
-                  {f.required && <span className="text-red-400 text-[10px]">required</span>}
+                  <span className="text-slate-600 dark:text-slate-300 truncate flex-1">{f.label || f.name || f.id}</span>
+                  {f.required && <span className="text-red-600 dark:text-red-400 text-[10px]">required</span>}
                 </div>
               ))}
             </div>
@@ -235,18 +235,16 @@ function FitDetail({
   onToggleAngle: (a: string) => void
 }) {
   const scoreColor =
-    fit.score >= 75 ? 'text-emerald-400'
-    : fit.score >= 50 ? 'text-yellow-400'
-    : 'text-red-400'
+    fit.score >= 75 ? 'text-emerald-600 dark:text-emerald-400'
+    : fit.score >= 50 ? 'text-yellow-600 dark:text-yellow-400'
+    : 'text-red-600 dark:text-red-400'
 
   return (
     <div className="mt-3 space-y-3">
       {/* Score */}
       <div className="flex items-center gap-3 bg-slate-100 dark:bg-white/5 rounded-lg p-3">
         <span className={`text-3xl font-bold tabular-nums ${scoreColor}`}>{fit.score}</span>
-        <div>
-          <p className="text-xs font-medium text-slate-200">{fit.headline}</p>
-        </div>
+        <p className="text-xs font-medium text-slate-700 dark:text-slate-200 leading-snug">{fit.headline}</p>
       </div>
 
       {/* Signals */}
@@ -258,8 +256,8 @@ function FitDetail({
               <div key={i} className="flex items-start gap-2 text-xs">
                 <span className={`mt-0.5 w-2 h-2 rounded-full shrink-0 ${signalColor(s.match)}`} />
                 <div>
-                  <span className="font-medium text-slate-300">{s.area}</span>
-                  {s.note && <span className="text-slate-500"> — {s.note}</span>}
+                  <span className="font-medium text-slate-700 dark:text-slate-300">{s.area}</span>
+                  {s.note && <span className="text-slate-500 dark:text-slate-500"> — {s.note}</span>}
                 </div>
               </div>
             ))}
@@ -271,7 +269,7 @@ function FitDetail({
       {fit.suggestedAngles.length > 0 && (
         <div>
           <p className="text-xs text-slate-500 mb-1.5">
-            Suggested angles <span className="text-slate-600">(toggle to include in docs)</span>
+            Suggested angles <span className="text-slate-400">(toggle to include in docs)</span>
           </p>
           <div className="flex flex-wrap gap-1.5">
             {fit.suggestedAngles.map((a) => (
@@ -281,8 +279,8 @@ function FitDetail({
                 className={[
                   'text-xs px-2 py-1 rounded-full border transition-colors',
                   activeAngles.includes(a)
-                    ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300'
-                    : 'border-white/10 text-slate-400 hover:border-white/20',
+                    ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-700 dark:text-indigo-300'
+                    : 'border-slate-300 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:border-slate-400 dark:hover:border-white/20',
                 ].join(' ')}
               >
                 {a}
@@ -299,7 +297,7 @@ function FitDetail({
             <p className="text-xs text-slate-500 mb-1">Green flags</p>
             <ul className="space-y-0.5">
               {fit.greenFlags.map((f, i) => (
-                <li key={i} className="text-xs text-emerald-400 leading-relaxed">+ {f}</li>
+                <li key={i} className="text-xs text-emerald-700 dark:text-emerald-400 leading-relaxed">+ {f}</li>
               ))}
             </ul>
           </div>
@@ -309,7 +307,7 @@ function FitDetail({
             <p className="text-xs text-slate-500 mb-1">Gaps / risks</p>
             <ul className="space-y-0.5">
               {fit.redFlags.map((f, i) => (
-                <li key={i} className="text-xs text-red-400 leading-relaxed">− {f}</li>
+                <li key={i} className="text-xs text-red-700 dark:text-red-400 leading-relaxed">− {f}</li>
               ))}
             </ul>
           </div>
@@ -335,7 +333,7 @@ function Field({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex gap-2 text-xs">
       <span className="text-slate-500 w-28 shrink-0">{label}</span>
-      <span className="text-slate-300">{value}</span>
+      <span className="text-slate-600 dark:text-slate-300">{value}</span>
     </div>
   )
 }
