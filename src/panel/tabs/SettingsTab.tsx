@@ -220,6 +220,24 @@ export default function SettingsTab() {
         </p>
       </Section>
 
+      {/* GitHub nudge */}
+      <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-4 text-center space-y-1.5">
+        <p className="text-xs font-medium text-slate-600 dark:text-slate-300">
+          Finding Smart Apply useful?
+        </p>
+        <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+          Give us a star on GitHub and tell someone who's job hunting — it genuinely helps.
+        </p>
+        <a
+          href="https://github.com/mhufton/smart-apply"
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1.5 mt-1 text-xs font-medium text-indigo-500 hover:text-indigo-400 transition-colors"
+        >
+          ★ Star on GitHub
+        </a>
+      </div>
+
     </div>
   )
 }

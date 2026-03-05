@@ -181,10 +181,10 @@ export default function JobTab({ job, fit, onJobScraped, onFitAnalyzed, onGenera
                 value={customContext}
                 onChange={e => setCustomContext(e.target.value)}
                 placeholder="e.g. lean into AI experience, this is a fintech role, keep it to 2 pages..."
-                className="input-base h-20 resize-none w-full"
+                className="input-base h-20 resize-y w-full"
               />
             </div>
-            <div className="flex rounded-lg overflow-hidden border border-white/10 mb-3 text-xs">
+            <div className="flex rounded-lg overflow-hidden border border-slate-200 dark:border-white/10 mb-3 text-xs">
               {(['cv', 'cover-letter', 'both'] as DocMode[]).map((mode) => (
                 <button
                   key={mode}
@@ -193,7 +193,7 @@ export default function JobTab({ job, fit, onJobScraped, onFitAnalyzed, onGenera
                     'flex-1 py-1.5 transition-colors',
                     docMode === mode
                       ? 'bg-indigo-600 text-white'
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-white/5',
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/5',
                   ].join(' ')}
                 >
                   {mode === 'cv' ? 'CV' : mode === 'cover-letter' ? 'Cover Letter' : 'Both'}

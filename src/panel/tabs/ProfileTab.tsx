@@ -262,7 +262,7 @@ export default function ProfileTab() {
                   value={resumeText}
                   onChange={e => setResumeText(e.target.value)}
                   placeholder="Paste your resume text here..."
-                  className="input-base h-24 resize-none w-full"
+                  className="input-base h-24 resize-y w-full"
                 />
                 <button
                   onClick={handleParseResume}
@@ -314,7 +314,7 @@ export default function ProfileTab() {
             value={profile.summary}
             onChange={e => update({ summary: e.target.value })}
             placeholder="Professional summary..."
-            className="input-base h-24 resize-none w-full"
+            className="input-base h-24 resize-y w-full"
           />
         </Section>
 
@@ -358,7 +358,7 @@ export default function ProfileTab() {
                   value={(exp.bullets ?? []).join('\n')}
                   onChange={e => updateExperience(exp.id, { bullets: e.target.value.split('\n') })}
                   placeholder="Bullet points (one per line)"
-                  className="input-base h-16 resize-none w-full text-xs"
+                  className="input-base h-16 resize-y w-full text-xs"
                 />
               </div>
             ))}
@@ -457,7 +457,7 @@ export default function ProfileTab() {
                 value={projectBlurb}
                 onChange={e => setProjectBlurb(e.target.value)}
                 placeholder="e.g. I built an AI summary app that lives in the iOS/Android share sheet, using Google Cloud and a self-hosted Vertex AI backend running Gemini..."
-                className="input-base h-20 resize-none w-full"
+                className="input-base h-20 resize-y w-full"
               />
               <button
                 onClick={handleExtractProject}
@@ -491,7 +491,7 @@ export default function ProfileTab() {
                   value={proj.description}
                   onChange={e => updateProject(proj.id, { description: e.target.value })}
                   placeholder="What you built, how, and why it matters..."
-                  className="input-base h-16 resize-none w-full text-xs"
+                  className="input-base h-16 resize-y w-full text-xs"
                 />
                 <input
                   type="text"
@@ -535,7 +535,7 @@ export default function ProfileTab() {
                   value={note.content}
                   onChange={e => updateContextNote(note.id, { content: e.target.value })}
                   placeholder="Write anything useful for Claude to know..."
-                  className="input-base h-16 resize-none w-full text-xs"
+                  className="input-base h-16 resize-y w-full text-xs"
                 />
               </div>
             ))}

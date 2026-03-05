@@ -237,7 +237,7 @@ export default function DocumentsTab({ docs, job, generating, onDocsChange, onOp
               value={activeDoc}
               onChange={e => handleChange(e.target.value)}
               className="w-full h-full bg-slate-50 dark:bg-[#0f1117] text-slate-800 dark:text-slate-200
-                         text-xs font-mono p-4 resize-none outline-none border-none leading-relaxed"
+                         text-xs font-mono p-4 resize-y outline-none border-none leading-relaxed"
               spellCheck
             />
           ) : (
