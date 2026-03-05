@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { ScrapedJob, FitAnalysis, GeneratedDocuments } from '../../types'
-import { callHaiku, callSonnet, buildFitPrompt, buildDocsPrompt, parseDocsResponse, type DocMode } from '../lib/claude'
+import { callHaiku, callSonnet, buildFitPrompt, buildDocsPrompt, buildJobParsePrompt, parseDocsResponse, type DocMode } from '../lib/claude'
 import { loadProfile } from '../lib/storage'
 import ErrorBanner from '../components/ErrorBanner'
 import Spinner from '../components/Spinner'
@@ -26,13 +26,36 @@ export default function JobTab({ job, fit, onJobScraped, onFitAnalyzed, onGenera
 
   async function handleScrape() {
     setScraping(true)
+    setError('')
     try {
       const result = await scrapeCurrentPage()
       if ('error' in result) {
-        console.warn('[Smart Apply] Scrape failed:', result.error)
+        setError(result.error as string)
         return
       }
-      onJobScraped(result)
+
+      const { _rawText, ...job } = result as ScrapedJob & { _rawText?: string }
+
+      // Always parse with Haiku — raw text beats brittle selectors on every platform
+      if (_rawText) {
+        const prompt = buildJobParsePrompt(_rawText, job.url)
+        let raw = ''
+        await callHaiku([{ role: 'user', content: prompt }], chunk => { raw += chunk })
+        try {
+          const jsonMatch = raw.match(/```json\s*([\s\S]+?)\s*```/) ?? raw.match(/(\{[\s\S]+\})/)
+          if (jsonMatch) {
+            const parsed = JSON.parse(jsonMatch[1])
+            job.title       = parsed.title       || job.title
+            job.company     = parsed.company     || job.company
+            job.location    = parsed.location    || job.location
+            job.description = parsed.description || job.description
+          }
+        } catch { /* keep whatever fields exist */ }
+      }
+
+      onJobScraped(job)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Scrape failed.')
     } finally {
       setScraping(false)
     }

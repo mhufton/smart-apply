@@ -1,7 +1,7 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import type { ScrapedJob, FitAnalysis, GeneratedDocuments, ChatMessage } from '../types'
 import { callSonnet, buildDocsPrompt, parseDocsResponse } from './lib/claude'
-import { loadProfile, appendDocHistory } from './lib/storage'
+import { loadProfile, appendDocHistory, getCachedJob, upsertCachedJob } from './lib/storage'
 import JobTab from './tabs/JobTab'
 import ProfileTab from './tabs/ProfileTab'
 import DocumentsTab from './tabs/DocumentsTab'
@@ -27,10 +27,34 @@ export default function App() {
   const [generating, setGenerating] = useState(false)
   const docsRef = useRef<GeneratedDocuments | null>(null)
 
+  // On mount: restore job + fit from cache if we're on a URL we've seen before
+  useEffect(() => {
+    chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
+      const url = tabs[0]?.url
+      if (!url) return
+      const cached = await getCachedJob(url)
+      if (cached) {
+        const { fitAnalysis, id: _id, ...scraped } = cached
+        setJob(scraped as ScrapedJob)
+        if (fitAnalysis) setFit(fitAnalysis)
+      }
+    })
+  }, [])
+
   // Keep ref in sync so handleGenerateDone can read the final value
   function handleDocsChange(d: GeneratedDocuments) {
     docsRef.current = d
     setDocs(d)
+  }
+
+  function handleJobScraped(j: ScrapedJob) {
+    setJob(j)
+    upsertCachedJob(j).catch(console.error)
+  }
+
+  function handleFitAnalyzed(f: FitAnalysis) {
+    setFit(f)
+    if (job) upsertCachedJob(job, f).catch(console.error)
   }
 
   // Called when JobTab starts generating — immediately show Docs tab
@@ -128,8 +152,8 @@ export default function App() {
           <JobTab
             job={job}
             fit={fit}
-            onJobScraped={setJob}
-            onFitAnalyzed={setFit}
+            onJobScraped={handleJobScraped}
+            onFitAnalyzed={handleFitAnalyzed}
             onGenerateDocs={handleDocsChange}
             onGenerateStart={handleGenerateStart}
             onGenerateDone={handleGenerateDone}

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import type { MasterProfile, Experience, Education, Project, ContextNote } from '../../types'
 import { loadProfile, saveProfile } from '../lib/storage'
-import { callHaiku, buildResumeParsePrompt, buildProjectExtractPrompt } from '../lib/claude'
+import { callHaiku, buildResumeParsePrompt, buildLinkedInParsePrompt, buildProjectExtractPrompt } from '../lib/claude'
 import Spinner from '../components/Spinner'
 
 export default function ProfileTab() {
@@ -57,12 +57,25 @@ export default function ProfileTab() {
     setScraping(true)
     try {
       const result = await chrome.runtime.sendMessage({ type: 'SCRAPE_PROFILE' })
-      if (result?.error) {
-        setError(result.error)
-        return
-      }
-      if (result && profile) {
-        const merged = mergeProfile(profile, result as Partial<MasterProfile>)
+      if (result?.error) { setError(result.error); return }
+      if (!result || !profile) return
+
+      // Background now returns raw text — parse it with Haiku
+      const prompt = buildLinkedInParsePrompt(result)
+      let raw = ''
+      await callHaiku([{ role: 'user', content: prompt }], chunk => { raw += chunk })
+      const jsonMatch = raw.match(/```json\s*([\s\S]+?)\s*```/) ?? raw.match(/(\{[\s\S]+\})/)
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[1]) as Partial<MasterProfile>
+        // Prefer scraped basics (name, location, linkedin url) over Haiku's output
+        parsed.basics = {
+          email: '', phone: '',
+          ...parsed.basics,
+          name: result.name || parsed.basics?.name || '',
+          location: result.location || parsed.basics?.location || '',
+          linkedin: result.linkedin || parsed.basics?.linkedin || '',
+        }
+        const merged = mergeProfile(profile, parsed)
         setProfile(merged)
         setSaved(false)
         setError('')

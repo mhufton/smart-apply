@@ -1,5 +1,5 @@
-import type { MasterProfile, DocHistoryEntry } from '../../types'
-import { db } from './db'
+import type { MasterProfile, DocHistoryEntry, ScrapedJob, FitAnalysis } from '../../types'
+import { db, type JobRow } from './db'
 
 // ── Defaults ──────────────────────────────────────────────────────────────────
 
@@ -69,4 +69,19 @@ export async function appendDocHistory(entry: DocHistoryEntry): Promise<void> {
 
 export async function deleteDocHistoryEntry(id: string): Promise<void> {
   await db.docHistory.delete(id)
+}
+
+// ── Job cache (keyed by URL) ───────────────────────────────────────────────────
+
+export async function getCachedJob(url: string): Promise<JobRow | undefined> {
+  return db.jobs.where('url').equals(url).first()
+}
+
+export async function upsertCachedJob(job: ScrapedJob, fitAnalysis?: FitAnalysis): Promise<void> {
+  const existing = await db.jobs.where('url').equals(job.url).first()
+  if (existing?.id !== undefined) {
+    await db.jobs.update(existing.id, { ...job, fitAnalysis })
+  } else {
+    await db.jobs.add({ ...job, fitAnalysis })
+  }
 }

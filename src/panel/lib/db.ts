@@ -1,5 +1,5 @@
 import Dexie, { type Table } from 'dexie'
-import type { MasterProfile, DocHistoryEntry, ScrapedJob } from '../../types'
+import type { MasterProfile, DocHistoryEntry, ScrapedJob, FitAnalysis } from '../../types'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 
@@ -9,7 +9,8 @@ export interface ProfileRow {
 }
 
 export interface JobRow extends ScrapedJob {
-  id?: number  // auto-incremented
+  id?: number          // auto-incremented
+  fitAnalysis?: FitAnalysis
 }
 
 // DocHistoryEntry already has a string id — stored as-is
@@ -25,9 +26,16 @@ class SmartApplyDB extends Dexie {
     super('SmartApplyDB')
 
     this.version(1).stores({
-      profile:    'id',               // singleton, id=1
+      profile:    'id',
       docHistory: 'id, generatedAt, jobTitle, jobCompany',
       jobs:       '++id, scrapedAt, platform, title, company',
+    })
+
+    // v2: adds url index on jobs for cache lookup
+    this.version(2).stores({
+      profile:    'id',
+      docHistory: 'id, generatedAt, jobTitle, jobCompany',
+      jobs:       '++id, scrapedAt, platform, title, company, url',
     })
   }
 }

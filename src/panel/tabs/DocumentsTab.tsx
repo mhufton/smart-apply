@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import type { GeneratedDocuments, ScrapedJob, DocHistoryEntry } from '../../types'
 import Spinner from '../components/Spinner'
-import { renderMarkdown, markdownToFullPage } from '../lib/markdown'
-import { loadDocHistory, deleteDocHistoryEntry, appendDocHistory } from '../lib/storage'
+import { renderMarkdown } from '../lib/markdown'
+import { loadDocHistory, deleteDocHistoryEntry, appendDocHistory, loadProfile } from '../lib/storage'
 
 interface Props {
   docs: GeneratedDocuments | null
@@ -23,9 +23,14 @@ export default function DocumentsTab({ docs, job, generating, onDocsChange, onOp
   const [historyPreview, setHistoryPreview] = useState<{ entry: DocHistoryEntry; field: 'cv' | 'coverLetter' } | null>(null)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [lastName, setLastName] = useState('')
 
   useEffect(() => {
     loadDocHistory().then(setHistory)
+    loadProfile().then(p => {
+      const name = p.basics.name.trim()
+      setLastName(name.split(' ').pop() ?? name)
+    })
   }, [])
 
   // Refresh history when switching to it, or after new generation
@@ -140,7 +145,7 @@ export default function DocumentsTab({ docs, job, generating, onDocsChange, onOp
                   {historyPreview.field === 'cv' ? 'CV' : 'Cover Letter'} · {historyPreview.entry.jobTitle} @ {historyPreview.entry.jobCompany}
                 </span>
                 <button
-                  onClick={() => exportToPdf(historyPreview.entry[historyPreview.field], historyPreview.field === 'cv' ? 'CV' : 'Cover Letter')}
+                  onClick={() => exportToPdf(historyPreview.entry[historyPreview.field], historyPreview.field === 'cv' ? 'CV' : 'Cover-Letter', lastName, historyPreview.entry.jobCompany)}
                   className="btn-secondary text-xs px-2"
                 >PDF</button>
                 <button
@@ -181,7 +186,7 @@ export default function DocumentsTab({ docs, job, generating, onDocsChange, onOp
                               className="btn-ghost text-[10px] px-2 py-1"
                             >View</button>
                             <button
-                              onClick={() => exportToPdf(entry[field], field === 'cv' ? 'CV' : 'Cover Letter')}
+                              onClick={() => exportToPdf(entry[field], field === 'cv' ? 'CV' : 'Cover-Letter', lastName, entry.jobCompany)}
                               className="btn-ghost text-[10px] px-2 py-1"
                             >PDF</button>
                             <button
@@ -269,7 +274,7 @@ export default function DocumentsTab({ docs, job, generating, onDocsChange, onOp
             {injecting ? 'Filling...' : 'Fill form'}
           </button>
           <button
-            onClick={() => exportToPdf(activeDoc, docTitle)}
+            onClick={() => exportToPdf(activeDoc, docTitle, lastName, job?.company ?? '')}
             disabled={!activeDoc}
             className="btn-secondary text-xs px-3"
           >PDF</button>
@@ -295,8 +300,66 @@ function copyToClipboard(text: string) {
   navigator.clipboard.writeText(text).catch(console.error)
 }
 
-function exportToPdf(text: string, title: string) {
-  const html = markdownToFullPage(text, title)
-  const url = 'data:text/html;charset=utf-8,' + encodeURIComponent(html)
-  chrome.tabs.create({ url })
+async function exportToPdf(markdown: string, docType: string, lastName = '', company = '') {
+  const slug = (s: string) => s.trim().replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '')
+  const title = [slug(lastName), slug(company), slug(docType)].filter(Boolean).join('-') || docType
+  const { jsPDF } = await import('jspdf')
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' })
+  const pageW = doc.internal.pageSize.getWidth()
+  const pageH = doc.internal.pageSize.getHeight()
+  const margin = 18
+  const contentW = pageW - margin * 2
+  let y = margin
+
+  function checkPage(needed = 6) {
+    if (y + needed > pageH - margin) { doc.addPage(); y = margin }
+  }
+
+  function addText(text: string, size: number, style: 'normal' | 'bold', color: [number,number,number], indent = 0) {
+    doc.setFontSize(size)
+    doc.setFont('helvetica', style)
+    doc.setTextColor(...color)
+    const lines = doc.splitTextToSize(text, contentW - indent)
+    for (const line of lines) {
+      checkPage()
+      doc.text(line, margin + indent, y)
+      y += size * 0.45
+    }
+  }
+
+  for (const raw of markdown.split('\n')) {
+    const line = raw.trimEnd()
+    if (line.startsWith('# ')) {
+      y += 2
+      addText(line.slice(2), 18, 'bold', [20, 20, 20])
+      y += 2
+    } else if (line.startsWith('## ')) {
+      y += 3
+      checkPage(8)
+      addText(line.slice(3).toUpperCase(), 8, 'bold', [100, 100, 100])
+      doc.setDrawColor(200, 200, 200)
+      doc.line(margin, y, margin + contentW, y)
+      y += 3
+    } else if (line.startsWith('### ')) {
+      y += 1
+      addText(line.slice(4), 10, 'bold', [30, 30, 30])
+    } else if (/^[•\-\*] /.test(line)) {
+      checkPage()
+      doc.setFontSize(9.5)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(50, 50, 50)
+      const bullet = line.slice(2).replace(/\*\*(.+?)\*\*/g, '$1')
+      const lines = doc.splitTextToSize(bullet, contentW - 6)
+      doc.text('•', margin + 1, y)
+      doc.text(lines, margin + 5, y)
+      y += lines.length * 4.3
+    } else if (line.trim() === '' || /^---+$/.test(line.trim())) {
+      y += 2
+    } else {
+      const clean = line.replace(/\*\*(.+?)\*\*/g, '$1').replace(/\*(.+?)\*/g, '$1')
+      if (clean.trim()) addText(clean, 9.5, 'normal', [50, 50, 50])
+    }
+  }
+
+  doc.save(`${title.replace(/\s+/g, '_')}.pdf`)
 }

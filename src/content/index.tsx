@@ -17,6 +17,7 @@ function detectPlatform(): ScrapedJob['platform'] {
   if (host.includes('workday.com') || document.querySelector('[data-automation-id]')) return 'workday'
   if (host.includes('linkedin.com')) return 'linkedin'
   if (host.includes('indeed.com')) return 'indeed'
+  if (host.includes('amazon.jobs')) return 'amazon'
   return 'unknown'
 }
 
@@ -71,170 +72,28 @@ function scrapeFormFields(): FormField[] {
   return fields
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-/** Try selectors in order, return first non-empty text match */
-function firstText(...selectors: string[]): string {
-  for (const sel of selectors) {
-    if (!sel) continue
-    const el = document.querySelector<HTMLElement>(sel)
-    const text = el?.innerText?.trim() ?? el?.textContent?.trim() ?? ''
-    if (text) return text
-  }
-  return ''
-}
-
-// ── Platform-specific scrapers ────────────────────────────────────────────────
-
-function scrapeLinkedInJob() {
-  const title = firstText(
-    '.job-details-jobs-unified-top-card__job-title h1',
-    '.jobs-unified-top-card__job-title h1',
-    '.t-24.t-bold.inline',
-    'h1',
-  )
-  const company = firstText(
-    '.job-details-jobs-unified-top-card__company-name a',
-    '.job-details-jobs-unified-top-card__company-name',
-    '.jobs-unified-top-card__company-name a',
-    '.jobs-unified-top-card__company-name',
-  )
-  const location = firstText(
-    '.job-details-jobs-unified-top-card__primary-description-without-tagline .tvm__text',
-    '.jobs-unified-top-card__bullet',
-    '.jobs-unified-top-card__workplace-type',
-  )
-  const description = firstText(
-    // Job details panel (search results view)
-    '.jobs-search__job-details--wrapper .jobs-description-content__text',
-    '.jobs-search__job-details--wrapper .jobs-description',
-    '.jobs-search__job-details--wrapper #job-details',
-    // Standalone job page
-    '#job-details',
-    '.jobs-description-content__text--stretch',
-    '.jobs-description-content__text',
-    '.jobs-description',
-  )
-  return { title, company, location, description }
-}
-
-function scrapeGreenhouseJob() {
-  const title = firstText('h1.app-title', '.job-post h1', 'h1')
-  const company = firstText('[class*="company-name"]', '[class*="company"]')
-  const location = firstText('.location', '[class*="location"]')
-  const description = firstText(
-    '#content .job__description',
-    '#content',
-    '.job-post__description',
-    '[class*="description"]',
-  )
-  return { title, company, location, description }
-}
-
-function scrapeLeverJob() {
-  const title = firstText('.posting-headline h2', 'h2', 'h1')
-  const company = document.querySelector<HTMLImageElement>('.main-header-logo img')?.alt ?? ''
-  const location = firstText('.sort-by-time.posting-category', '[class*="location"]', '.posting-category')
-  const description = firstText(
-    '.section.page-full-width',
-    '[class*="posting-description"]',
-    '.content',
-  )
-  return { title, company, location, description }
-}
-
-function scrapeWorkdayJob() {
-  const title = firstText(
-    '[data-automation-id="jobPostingHeader"]',
-    'h2[class*="heading"]',
-    'h1',
-  )
-  const company = firstText('[data-automation-id="company"]', '[class*="company"]')
-  const location = firstText('[data-automation-id="locations"]', '[class*="location"]')
-  const description = firstText(
-    '[data-automation-id="jobPostingDescription"]',
-    '[class*="jobDescription"]',
-    '[class*="description"]',
-  )
-  return { title, company, location, description }
-}
-
-function scrapeIndeedJob() {
-  const title = firstText(
-    '[data-testid="jobsearch-JobInfoHeader-title"]',
-    '.jobsearch-JobInfoHeader-title',
-    'h1',
-  )
-  const company = firstText(
-    '[data-testid="inlineHeader-companyName"] a',
-    '[data-testid="inlineHeader-companyName"]',
-    '.jobsearch-CompanyInfoContainer a',
-  )
-  const location = firstText(
-    '[data-testid="job-location"]',
-    '.jobsearch-JobInfoHeader-subtitle [class*="location"]',
-  )
-  const description = firstText(
-    '#jobDescriptionText',
-    '.jobsearch-jobDescriptionText',
-    '[class*="jobDescription"]',
-  )
-  return { title, company, location, description }
-}
-
-/** Generic fallback — finds the largest content block that looks like a job description */
-function scrapeGenericJob() {
-  const title = firstText(
-    'h1[class*="job"]', 'h1[class*="title"]', 'h1[class*="position"]',
-    '[class*="job-title"]', '[class*="jobTitle"]', '[class*="position-title"]',
-    'h1',
-  )
-  const company = firstText(
-    '[class*="company-name"]', '[class*="companyName"]', '[class*="employer"]',
-    '[itemprop="hiringOrganization"]',
-  )
-  const location = firstText(
-    '[class*="job-location"]', '[class*="jobLocation"]',
-    '[itemprop="jobLocation"]', '[class*="location"]',
-  )
-
-  // Pick the longest block that looks like a description
-  const candidates = Array.from(
-    document.querySelectorAll<HTMLElement>(
-      '#job-description, #jobDescription, [class*="job-description"], [class*="jobDescription"], ' +
-      '[class*="job-details"], [class*="jobDetails"], [class*="description"], ' +
-      '[itemprop="description"], article, main'
-    )
-  )
-  const description = candidates
-    .map(el => el.innerText?.trim() ?? '')
-    .filter(t => t.length > 200)
-    .sort((a, b) => b.length - a.length)[0] ?? ''
-
-  return { title, company, location, description }
-}
-
 // ── Job scrape entry ──────────────────────────────────────────────────────────
 
-function scrapeJobDescription(): Pick<ScrapedJob, 'title' | 'company' | 'location' | 'description'> {
+function scrapeJob(): ScrapedJob & { _rawText: string } {
   const platform = detectPlatform()
-  switch (platform) {
-    case 'linkedin':   return scrapeLinkedInJob()
-    case 'greenhouse': return scrapeGreenhouseJob()
-    case 'lever':      return scrapeLeverJob()
-    case 'workday':    return scrapeWorkdayJob()
-    case 'indeed':     return scrapeIndeedJob()
-    default:           return scrapeGenericJob()
-  }
-}
 
-function scrapeJob(): ScrapedJob {
+  // Grab the richest text content available — Haiku will extract structure in the panel
+  const mainEl = document.querySelector('main')
+    ?? document.querySelector('[role="main"]')
+    ?? document.querySelector('article')
+    ?? document.body
+  const _rawText = mainEl.innerText
+    .replace(/\s{3,}/g, '\n\n')
+    .trim()
+    .slice(0, 10000)
+
   return {
-    ...scrapeJobDescription(),
-    platform: detectPlatform(),
+    title: '', company: '', location: '', description: '',
+    platform,
     url: location.href,
     formFields: scrapeFormFields(),
     scrapedAt: Date.now(),
+    _rawText,
   }
 }
 

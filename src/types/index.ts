@@ -61,7 +61,7 @@ export interface ScrapedJob {
   company: string
   location: string
   description: string
-  platform: 'greenhouse' | 'lever' | 'workday' | 'linkedin' | 'indeed' | 'unknown'
+  platform: 'greenhouse' | 'lever' | 'workday' | 'linkedin' | 'indeed' | 'amazon' | 'unknown'
   url: string
   formFields: FormField[]
   scrapedAt: number

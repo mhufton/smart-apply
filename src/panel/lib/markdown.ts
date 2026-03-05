@@ -62,40 +62,62 @@ export function markdownToFullPage(md: string, title = 'Document'): string {
   <style>
     body {
       font-family: 'Georgia', serif;
-      max-width: 780px;
-      margin: 48px auto;
-      line-height: 1.75;
+      max-width: 740px;
+      margin: 32px auto;
+      line-height: 1.5;
       color: #111;
-      font-size: 13px;
-      padding: 0 24px;
-    }
-    h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -0.3px; }
-    h2 {
       font-size: 12px;
+      padding: 0 20px;
+    }
+    h1 { font-size: 20px; margin: 0 0 3px; letter-spacing: -0.3px; }
+    h2 {
+      font-size: 10.5px;
       text-transform: uppercase;
       letter-spacing: 1.5px;
       color: #555;
       border-bottom: 1px solid #ddd;
-      padding-bottom: 3px;
-      margin: 20px 0 8px;
+      padding-bottom: 2px;
+      margin: 14px 0 6px;
     }
-    h3 { font-size: 13px; margin: 12px 0 2px; }
-    p { margin: 4px 0; }
-    ul { margin: 4px 0 8px 18px; padding: 0; }
-    li { margin: 2px 0; }
-    hr { border: none; border-top: 1px solid #eee; margin: 16px 0; }
-    code { font-family: monospace; font-size: 11px; background: #f5f5f5; padding: 1px 3px; border-radius: 2px; }
+    h3 { font-size: 12px; margin: 8px 0 2px; }
+    p { margin: 3px 0; }
+    ul { margin: 2px 0 6px 16px; padding: 0; }
+    li { margin: 1px 0; }
+    hr { border: none; border-top: 1px solid #eee; margin: 10px 0; }
+    code { font-family: monospace; font-size: 10px; background: #f5f5f5; padding: 1px 3px; border-radius: 2px; }
     strong { font-weight: 600; }
-    br { display: block; content: ''; margin: 6px 0; }
+    br { display: block; content: ''; margin: 4px 0; }
     @media print {
       body { margin: 24px auto; }
       h2 { color: #333; }
+      .print-tip { display: none; }
+    }
+    .print-tip {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: #fffbea;
+      border-top: 1px solid #e5d76b;
+      padding: 8px 16px;
+      font-size: 11px;
+      color: #555;
+      text-align: center;
+      font-family: system-ui, sans-serif;
     }
   </style>
 </head>
 <body>
 ${body}
-<script>window.addEventListener('load', () => window.print())</script>
+<div class="print-tip">
+  Tip: in the print dialog, uncheck <strong>Headers and footers</strong> to hide the URL from the printed page.
+</div>
+<script>
+  function triggerPrint() { window.print() }
+  if (document.readyState === 'complete') {
+    setTimeout(triggerPrint, 100)
+  } else {
+    window.addEventListener('load', () => setTimeout(triggerPrint, 100))
+  }
+</script>
 </body>
 </html>`
 }

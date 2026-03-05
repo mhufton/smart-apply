@@ -113,7 +113,7 @@ export default function SettingsTab() {
 
       <Section title="Storage">
         <p className="text-xs text-slate-400 leading-relaxed">
-          All data — your profile, API key, and generated documents — lives in <code className="text-indigo-400">chrome.storage.local</code> on this machine only. Nothing is synced to any server.
+          Your profile, job history, and generated documents are stored in <code className="text-indigo-400">IndexedDB</code> (via Dexie) on this machine only. Your API key is stored separately in <code className="text-indigo-400">chrome.storage.local</code>. Nothing is synced to any server.
         </p>
       </Section>
 
