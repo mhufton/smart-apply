@@ -129,8 +129,8 @@ async function readSSE(response: Response, onEvent: (json: any) => void): Promis
   }
 }
 
-const ANTHROPIC_SMALL = 'claude-haiku-4-5-20251001'
-const ANTHROPIC_LARGE = 'claude-sonnet-4-5'
+const ANTHROPIC_SMALL_DEFAULT = 'claude-haiku-4-5-20251001'
+const ANTHROPIC_LARGE_DEFAULT = 'claude-sonnet-4-5'
 
 async function stream(
   tier: 'small' | 'large',
@@ -141,17 +141,18 @@ async function stream(
   const config = await getProviderConfig()
   if (!config) throw new Error('No API key set. Add one in the Settings tab.')
 
+  const model = tier === 'small'
+    ? (config.smallModel || config.largeModel)
+    : (config.largeModel || config.smallModel)
+
   if (config.provider === 'openai-compatible') {
     if (!config.endpoint) throw new Error('No endpoint set. Configure it in the Settings tab.')
-    const model = tier === 'small'
-      ? (config.smallModel || config.largeModel)
-      : (config.largeModel || config.smallModel)
     if (!model) throw new Error('No model set. Configure it in the Settings tab.')
     return streamOpenAICompat(model, messages, config.apiKey, config.endpoint, onChunk, maxTokens)
   }
 
-  const model = tier === 'small' ? ANTHROPIC_SMALL : ANTHROPIC_LARGE
-  return streamAnthropic(model, messages, config.apiKey, onChunk, maxTokens)
+  const anthropicModel = model || (tier === 'small' ? ANTHROPIC_SMALL_DEFAULT : ANTHROPIC_LARGE_DEFAULT)
+  return streamAnthropic(anthropicModel, messages, config.apiKey, onChunk, maxTokens)
 }
 
 // ── Model callers ─────────────────────────────────────────────────────────────

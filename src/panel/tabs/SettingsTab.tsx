@@ -14,7 +14,7 @@ type Preset = {
 }
 
 const PRESETS: Preset[] = [
-  { label: 'Anthropic',   provider: 'anthropic',        endpoint: '',                                                 keyPrefix: 'sk-ant-', keyPlaceholder: 'sk-ant-api03-...', smallModel: 'claude-haiku-4-5-20251001', largeModel: 'claude-sonnet-4-5',           docsUrl: 'https://console.anthropic.com/settings/keys' },
+  { label: 'Anthropic',   provider: 'anthropic',        endpoint: 'https://api.anthropic.com',                        keyPrefix: 'sk-ant-', keyPlaceholder: 'sk-ant-api03-...', smallModel: 'claude-haiku-4-5-20251001', largeModel: 'claude-sonnet-4-5',           docsUrl: 'https://console.anthropic.com/settings/keys' },
   { label: 'OpenAI',      provider: 'openai-compatible', endpoint: 'https://api.openai.com/v1',                       keyPrefix: 'sk-',     keyPlaceholder: 'sk-...',           smallModel: 'gpt-4o-mini',               largeModel: 'gpt-4o',                      docsUrl: 'https://platform.openai.com/api-keys' },
   { label: 'Gemini',      provider: 'openai-compatible', endpoint: 'https://generativelanguage.googleapis.com/v1beta/openai', keyPrefix: 'AI', keyPlaceholder: 'AIza...',        smallModel: 'gemini-2.0-flash',          largeModel: 'gemini-2.5-pro-preview-03-25', docsUrl: 'https://aistudio.google.com/apikey' },
   { label: 'Groq',        provider: 'openai-compatible', endpoint: 'https://api.groq.com/openai/v1',                  keyPrefix: 'gsk_',    keyPlaceholder: 'gsk_...',          smallModel: 'llama-3.1-8b-instant',      largeModel: 'llama-3.3-70b-versatile',     docsUrl: 'https://console.groq.com/keys' },
@@ -36,9 +36,7 @@ export default function SettingsTab() {
     getProviderConfig().then(cfg => {
       if (!cfg) return
       setConfig(cfg)
-      const idx = cfg.provider === 'anthropic'
-        ? 0
-        : PRESETS.findIndex(p => p.endpoint === cfg.endpoint && p.provider === 'openai-compatible')
+      const idx = PRESETS.findIndex(p => p.provider === cfg.provider && (p.provider === 'anthropic' || p.endpoint === cfg.endpoint))
       setPreset(idx >= 0 ? idx : PRESETS.length - 1)
       setEndpoint(cfg.endpoint)
       setSmallModel(cfg.smallModel)
@@ -54,12 +52,10 @@ export default function SettingsTab() {
     setError('')
   }
 
-  const isAnthropic = PRESETS[preset].provider === 'anthropic'
-
   async function handleSave() {
     const key = keyInput.trim()
     if (!key) { setError('Enter your API key.'); return }
-    if (!isAnthropic && !endpoint.trim()) { setError('Enter the endpoint URL.'); return }
+    if (!endpoint.trim()) { setError('Enter the endpoint URL.'); return }
 
     setStatus('saving')
     setError('')
@@ -67,9 +63,9 @@ export default function SettingsTab() {
       await saveProviderConfig({
         provider: PRESETS[preset].provider,
         apiKey: key,
-        endpoint: isAnthropic ? '' : endpoint.trim(),
-        smallModel: isAnthropic ? '' : (smallModel.trim() || PRESETS[preset].smallModel),
-        largeModel: isAnthropic ? '' : (largeModel.trim() || PRESETS[preset].largeModel),
+        endpoint: endpoint.trim(),
+        smallModel: smallModel.trim() || PRESETS[preset].smallModel,
+        largeModel: largeModel.trim() || PRESETS[preset].largeModel,
       })
       setConfig(await getProviderConfig())
       setKeyInput('')
@@ -134,44 +130,39 @@ export default function SettingsTab() {
               ))}
             </div>
 
-            {/* Endpoint + models — hidden for Anthropic */}
-            {!isAnthropic && (
-              <>
-                <div>
-                  <label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider">Endpoint URL</label>
-                  <input
-                    type="text"
-                    value={endpoint}
-                    onChange={e => setEndpoint(e.target.value)}
-                    placeholder="https://api.openai.com/v1"
-                    className="input-base w-full font-mono text-[11px]"
-                    spellCheck={false}
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider">Small model <span className="normal-case text-slate-500">(parsing, fit, chat)</span></label>
-                  <input
-                    type="text"
-                    value={smallModel}
-                    onChange={e => setSmallModel(e.target.value)}
-                    placeholder={PRESETS[preset].smallModel || 'e.g. gpt-4o-mini'}
-                    className="input-base w-full font-mono text-[11px]"
-                    spellCheck={false}
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider">Large model <span className="normal-case text-slate-500">(CV + cover letter)</span></label>
-                  <input
-                    type="text"
-                    value={largeModel}
-                    onChange={e => setLargeModel(e.target.value)}
-                    placeholder={PRESETS[preset].largeModel || 'e.g. gpt-4o'}
-                    className="input-base w-full font-mono text-[11px]"
-                    spellCheck={false}
-                  />
-                </div>
-              </>
-            )}
+            <div>
+              <label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider">Endpoint</label>
+              <input
+                type="text"
+                value={endpoint}
+                onChange={e => setEndpoint(e.target.value)}
+                placeholder="https://api.anthropic.com"
+                className="input-base w-full font-mono text-[11px]"
+                spellCheck={false}
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider">Small model <span className="normal-case text-slate-500">(parsing, fit, chat)</span></label>
+              <input
+                type="text"
+                value={smallModel}
+                onChange={e => setSmallModel(e.target.value)}
+                placeholder={PRESETS[preset].smallModel || 'e.g. gpt-4o-mini'}
+                className="input-base w-full font-mono text-[11px]"
+                spellCheck={false}
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider">Large model <span className="normal-case text-slate-500">(CV + cover letter)</span></label>
+              <input
+                type="text"
+                value={largeModel}
+                onChange={e => setLargeModel(e.target.value)}
+                placeholder={PRESETS[preset].largeModel || 'e.g. gpt-4o'}
+                className="input-base w-full font-mono text-[11px]"
+                spellCheck={false}
+              />
+            </div>
 
             {/* API key */}
             <div>
