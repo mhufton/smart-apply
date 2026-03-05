@@ -1,5 +1,11 @@
 import type { ExtMessage, ScrapedJob, FormField, MasterProfile } from '../types'
 
+// Bail out if the extension context has been invalidated (e.g. after a reload).
+// This prevents stale content scripts from looping on chrome-extension://invalid/ errors.
+if (!chrome.runtime?.id) {
+  throw new Error('[Smart Apply] Extension context invalidated — reload the page.')
+}
+
 console.log('[Smart Apply] content script loaded')
 
 // ── Job Scraping ──────────────────────────────────────────────────────────────
