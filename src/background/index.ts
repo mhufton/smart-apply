@@ -1,4 +1,4 @@
-import type { ExtMessage } from '../types'
+import type { ExtMessage, FormField } from '../types'
 
 // Open side panel when the toolbar icon is clicked
 chrome.action.onClicked.addListener(async (tab) => {
@@ -30,8 +30,25 @@ function linkedInScrapeJob() {
     .trim()
     .slice(0, 10000)
 
+  // Essay question detection — inlined because executeScript serialises this function
+  const ESSAY_KW = [
+    'cover letter','personal statement','why do you want','why are you','why us','why this',
+    'tell us','tell me','describe','explain','what motivates','what interests',
+    'additional information','additional comments','anything else','background',
+    'experience with','how have you','how do you','what would you',
+    'please share','please describe','please explain',
+  ]
+  function isEssay(label: string, type: string, required: boolean): boolean {
+    if (type === 'checkbox' || type === 'radio' || type === 'select' || type === 'file') return false
+    const lower = label.toLowerCase()
+    if (ESSAY_KW.some(kw => lower.includes(kw))) return true
+    if (type === 'textarea' && label.length > 60) return true
+    if (type === 'textarea' && required && /^(Field \d+)?$/.test(label.trim())) return true
+    return false
+  }
+
   // Inline form field scraping (still DOM-based — needed for injection)
-  const formFields: Array<{ label: string; type: string; name: string; id: string; required: boolean; selector: string }> = []
+  const formFields: FormField[] = []
   document.querySelectorAll('input, textarea, select').forEach((el, i) => {
     const input = el as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
     const inputType = (input as HTMLInputElement).type
@@ -57,7 +74,12 @@ function linkedInScrapeJob() {
       else if (inputType === 'checkbox') type = 'checkbox'
       else if (inputType === 'radio') type = 'radio'
     }
-    formFields.push({ label, type, name: input.name, id: input.id, required: (input as HTMLInputElement).required, selector: input.id ? `#${input.id}` : `[name="${input.name}"]` })
+    const required = (input as HTMLInputElement).required
+    formFields.push({
+      label, type: type as FormField['type'], name: input.name, id: input.id,
+      required, isEssayQuestion: isEssay(label, type, required),
+      selector: input.id ? `#${input.id}` : `[name="${input.name}"]`,
+    })
   })
 
   return { title: '', company: '', location: '', description: '', platform: 'linkedin', url: location.href, formFields, scrapedAt: Date.now(), _rawText }

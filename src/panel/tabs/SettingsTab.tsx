@@ -22,6 +22,13 @@ const PRESETS: Preset[] = [
   { label: 'Custom',      provider: 'openai-compatible', endpoint: '',                                                 keyPrefix: '',        keyPlaceholder: 'API key',          smallModel: '',                          largeModel: '',                            docsUrl: '' },
 ]
 
+export const AUTO_ANALYZE_KEY = 'autoAnalyzeFit'
+
+export async function getAutoAnalyze(): Promise<boolean> {
+  const result = await chrome.storage.local.get(AUTO_ANALYZE_KEY)
+  return result[AUTO_ANALYZE_KEY] === true
+}
+
 export default function SettingsTab() {
   const [config, setConfig] = useState<ProviderConfig | null>(null)
   const [preset, setPreset] = useState(0)
@@ -31,8 +38,10 @@ export default function SettingsTab() {
   const [largeModel, setLargeModel] = useState(PRESETS[0].largeModel)
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [error, setError] = useState('')
+  const [autoAnalyze, setAutoAnalyze] = useState(false)
 
   useEffect(() => {
+    chrome.storage.local.get(AUTO_ANALYZE_KEY).then(r => setAutoAnalyze(r[AUTO_ANALYZE_KEY] === true))
     getProviderConfig().then(cfg => {
       if (!cfg) return
       setConfig(cfg)
@@ -218,6 +227,33 @@ export default function SettingsTab() {
             </>
           )}
         </div>
+      </Section>
+
+      <Section title="Behaviour">
+        <label className="flex items-center justify-between gap-3 cursor-pointer">
+          <div>
+            <p className="text-xs font-medium text-slate-600 dark:text-slate-300">Auto-analyze fit after scraping</p>
+            <p className="text-[10px] text-slate-400 mt-0.5">Runs fit analysis automatically every time you scrape a job page.</p>
+          </div>
+          <button
+            role="switch"
+            aria-checked={autoAnalyze}
+            onClick={async () => {
+              const next = !autoAnalyze
+              setAutoAnalyze(next)
+              await chrome.storage.local.set({ [AUTO_ANALYZE_KEY]: next })
+            }}
+            className={[
+              'relative shrink-0 w-9 h-5 rounded-full transition-colors',
+              autoAnalyze ? 'bg-indigo-500' : 'bg-slate-300 dark:bg-white/20',
+            ].join(' ')}
+          >
+            <span className={[
+              'absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform',
+              autoAnalyze ? 'translate-x-4' : 'translate-x-0',
+            ].join(' ')} />
+          </button>
+        </label>
       </Section>
 
       <Section title="Storage">

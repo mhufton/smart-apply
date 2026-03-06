@@ -53,6 +53,7 @@ export interface FormField {
   name: string
   id: string
   required: boolean
+  isEssayQuestion: boolean
   selector: string
 }
 
@@ -110,6 +111,68 @@ export interface DocHistoryEntry {
   jobCompany: string
   cv: string           // empty string if not generated
   coverLetter: string  // empty string if not generated
+}
+
+// ── Application Tracker ───────────────────────────────────────────────────────
+
+export type ApplicationStatus =
+  | 'applied'
+  | 'interviewing'
+  | 'offer'
+  | 'rejected'
+  | 'withdrawn'
+  | 'archived'
+
+export interface InterviewStage {
+  id: string
+  label: string
+  scheduledAt?: number
+  completedAt?: number
+  notes?: string
+}
+
+export interface ApplicationContact {
+  id: string
+  name: string
+  role?: string
+  email?: string
+  linkedin?: string
+  notes?: string
+}
+
+export interface ApplicationEntry {
+  // Identity
+  id: string
+  createdAt: number
+  updatedAt: number
+
+  // Job
+  jobTitle: string
+  jobCompany: string
+  jobLocation?: string
+  jobUrl: string                      // dedup key
+  jobPlatform: ScrapedJob['platform']
+  fitScore?: number                   // snapshot at time of generation
+
+  // Status
+  status: ApplicationStatus
+
+  // Document snapshots
+  cvSnapshot: string
+  coverLetterSnapshot: string
+
+  // Notes
+  notes: string
+
+  // Future-proofing (no UI yet)
+  appliedAt?: number
+  interviews: InterviewStage[]
+  contacts: ApplicationContact[]
+  salaryExpected?: string
+  salaryOffered?: string
+  offerDeadline?: number
+  rejectedAt?: number
+  tags: string[]
 }
 
 // ── Chat ──────────────────────────────────────────────────────────────────────

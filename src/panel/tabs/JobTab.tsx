@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { ScrapedJob, FitAnalysis, GeneratedDocuments } from '../../types'
 import { callHaiku, callSonnet, buildFitPrompt, buildDocsPrompt, buildJobParsePrompt, parseDocsResponse, type DocMode } from '../lib/claude'
+import { getAutoAnalyze } from './SettingsTab'
 import { loadProfile } from '../lib/storage'
 import ErrorBanner from '../components/ErrorBanner'
 import Spinner from '../components/Spinner'
@@ -19,6 +20,7 @@ const SCRAPE_TIP_KEY = 'sa_scrape_tip_dismissed'
 
 export default function JobTab({ job, fit, onJobScraped, onFitAnalyzed, onGenerateDocs, onGenerateStart, onGenerateDone }: Props) {
   const [scraping, setScraping] = useState(false)
+  const [scrapingFields, setScrapingFields] = useState(false)
   const [analyzing, setAnalyzing] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [activeAngles, setActiveAngles] = useState<string[]>([])
@@ -63,10 +65,37 @@ export default function JobTab({ job, fit, onJobScraped, onFitAnalyzed, onGenera
       }
 
       onJobScraped(job)
+
+      if (await getAutoAnalyze()) {
+        setAnalyzing(true)
+        try {
+          const profile = await loadProfile()
+          const fitPrompt = buildFitPrompt(job, profile)
+          let fitRaw = ''
+          await callHaiku([{ role: 'user', content: fitPrompt }], chunk => { fitRaw += chunk })
+          onFitAnalyzed(parseFitResponse(fitRaw))
+        } catch { /* fit failure doesn't block the scrape result */ }
+        finally { setAnalyzing(false) }
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Scrape failed.')
     } finally {
       setScraping(false)
+    }
+  }
+
+  async function handleScrapeFields() {
+    if (!job) return
+    setScrapingFields(true)
+    setError('')
+    try {
+      const result = await scrapeCurrentPage()
+      if ('error' in result) { setError(result.error as string); return }
+      onJobScraped({ ...job, formFields: result.formFields })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Field scrape failed.')
+    } finally {
+      setScrapingFields(false)
     }
   }
 
@@ -213,8 +242,16 @@ export default function JobTab({ job, fit, onJobScraped, onFitAnalyzed, onGenera
         )}
 
         {/* Form Fields */}
-        {job && (job.formFields ?? []).length > 0 && (
+        {job && (
           <Section title={`Form Fields (${(job.formFields ?? []).length})`}>
+            <button
+              onClick={handleScrapeFields}
+              disabled={scrapingFields}
+              className="btn-secondary w-full flex items-center justify-center gap-2 mb-3"
+            >
+              {scrapingFields && <Spinner className="w-3 h-3" />}
+              {scrapingFields ? 'Scraping...' : 'Scrape form fields'}
+            </button>
             <div className="space-y-1">
               {(job.formFields ?? []).map((f, i) => (
                 <div key={i} className="flex items-center gap-2 text-xs py-1.5 border-b border-white/5 last:border-0">
@@ -223,6 +260,7 @@ export default function JobTab({ job, fit, onJobScraped, onFitAnalyzed, onGenera
                   </span>
                   <span className="text-slate-600 dark:text-slate-300 truncate flex-1">{f.label || f.name || f.id}</span>
                   {f.required && <span className="text-red-600 dark:text-red-400 text-[10px]">required</span>}
+                  {f.isEssayQuestion && <span className="text-amber-600 dark:text-amber-400 text-[10px]">essay</span>}
                 </div>
               ))}
             </div>

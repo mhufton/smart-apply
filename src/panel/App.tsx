@@ -1,21 +1,24 @@
 import { useState, useRef, useEffect } from 'react'
 import type { ScrapedJob, FitAnalysis, GeneratedDocuments, ChatMessage } from '../types'
 import { callSonnet, buildDocsPrompt, parseDocsResponse } from './lib/claude'
-import { loadProfile, appendDocHistory, getCachedJob, upsertCachedJob } from './lib/storage'
+import { loadProfile, getCachedJob, upsertCachedJob } from './lib/storage'
+import { upsertApplication } from './lib/db'
 import JobTab from './tabs/JobTab'
 import ProfileTab from './tabs/ProfileTab'
 import DocumentsTab from './tabs/DocumentsTab'
 import ChatTab from './tabs/ChatTab'
 import SettingsTab from './tabs/SettingsTab'
+import TrackerTab from './tabs/TrackerTab'
 
-type Tab = 'job' | 'profile' | 'documents' | 'chat' | 'settings'
+type Tab = 'job' | 'profile' | 'documents' | 'chat' | 'applied' | 'settings'
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: 'job',       label: 'Job'      },
-  { id: 'profile',   label: 'Profile'  },
-  { id: 'documents', label: 'Docs'     },
-  { id: 'chat',      label: 'Chat'     },
-  { id: 'settings',  label: 'Settings' },
+  { id: 'job',       label: 'Job'     },
+  { id: 'profile',   label: 'Profile' },
+  { id: 'documents', label: 'Docs'    },
+  { id: 'chat',      label: 'Chat'    },
+  { id: 'applied',   label: 'Applied' },
+  { id: 'settings',  label: '⚙'      },
 ]
 
 export default function App() {
@@ -67,14 +70,7 @@ export default function App() {
     setGenerating(false)
     const d = docsRef.current
     if (d && job) {
-      appendDocHistory({
-        id: crypto.randomUUID(),
-        generatedAt: Date.now(),
-        jobTitle: job.title,
-        jobCompany: job.company,
-        cv: d.cv,
-        coverLetter: d.coverLetter,
-      }).catch(console.error)
+      upsertApplication(job, d.cv, d.coverLetter, fit?.score).catch(console.error)
     }
   }
 
@@ -177,6 +173,9 @@ export default function App() {
             onMessagesChange={setChatMessages}
             onDocsUpdated={setDocs}
           />
+        )}
+        {activeTab === 'applied' && (
+          <TrackerTab />
         )}
         {activeTab === 'settings' && (
           <SettingsTab />

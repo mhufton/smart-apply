@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import type { GeneratedDocuments, ScrapedJob, DocHistoryEntry } from '../../types'
+import type { GeneratedDocuments, ScrapedJob, DocHistoryEntry, FormField } from '../../types'
 import Spinner from '../components/Spinner'
 import DOMPurify from 'dompurify'
 import { renderMarkdown } from '../lib/markdown'
@@ -15,7 +15,7 @@ interface Props {
   onGenerateMissing: (mode: 'cv' | 'cover-letter') => void
 }
 
-type DocView = 'cv' | 'cover' | 'history'
+type DocView = 'cv' | 'cover' | 'questions' | 'history'
 
 function safeHtml(markdown: string): string {
   return DOMPurify.sanitize(renderMarkdown(markdown))
@@ -31,12 +31,20 @@ export default function DocumentsTab({ docs, job, generating, onDocsChange, onOp
   const [saved, setSaved] = useState(false)
   const [lastName, setLastName] = useState('')
   const [historyPage, setHistoryPage] = useState<Record<'cv' | 'coverLetter', number>>({ cv: 0, coverLetter: 0 })
+  const [historySearch, setHistorySearch] = useState('')
   const PAGE_SIZE = 5
+
+  // Essay questions state
+  const [essayAnswers, setEssayAnswers] = useState<Record<string, string> | null>(null)
+  const [generatingEssays, setGeneratingEssays] = useState(false)
+  const [injectingSelector, setInjectingSelector] = useState<string | null>(null)
+  const [injectingAll, setInjectingAll] = useState(false)
+
+  const essayFields = (job?.formFields ?? []).filter(f => f.isEssayQuestion)
 
   useEffect(() => {
     loadDocHistory().then(h => {
       setHistory(h)
-      // If there's no active session doc but history exists, land on History tab
       if (!docs && h.length > 0) setView('history')
     })
     loadProfile().then(p => {
@@ -45,12 +53,16 @@ export default function DocumentsTab({ docs, job, generating, onDocsChange, onOp
     })
   }, [])
 
-  // Refresh history when switching to it, or after new generation
   useEffect(() => {
     if (view === 'history' || !generating) {
       loadDocHistory().then(setHistory)
     }
   }, [view, generating])
+
+  // Reset essay answers when job changes
+  useEffect(() => {
+    setEssayAnswers(null)
+  }, [job?.url])
 
   async function handleSaveToHistory() {
     if (!docs) return
@@ -95,7 +107,6 @@ export default function DocumentsTab({ docs, job, generating, onDocsChange, onOp
       let raw = ''
       await callSmall([{ role: 'user', content: prompt }], chunk => { raw += chunk })
 
-      // Extract JSON from response
       const jsonMatch = raw.match(/\{[\s\S]*\}/)
       if (!jsonMatch) throw new Error('No JSON in response')
       const fieldMap: Record<string, string> = JSON.parse(jsonMatch[0])
@@ -108,17 +119,67 @@ export default function DocumentsTab({ docs, job, generating, onDocsChange, onOp
     }
   }
 
+  async function handleGenerateEssayAnswers() {
+    if (!job) return
+    setGeneratingEssays(true)
+    try {
+      const profile = await loadProfile()
+      const prompt = buildFormFillPrompt(essayFields, profile, docs?.coverLetter ?? '')
+      if (!prompt) return
+
+      let raw = ''
+      await callSmall([{ role: 'user', content: prompt }], chunk => { raw += chunk })
+
+      const jsonMatch = raw.match(/\{[\s\S]*\}/)
+      if (!jsonMatch) throw new Error('No JSON in response')
+      const fieldMap: Record<string, string> = JSON.parse(jsonMatch[0])
+      setEssayAnswers(fieldMap)
+    } catch (e) {
+      console.error('[Smart Apply] Essay generation failed:', e)
+    } finally {
+      setGeneratingEssays(false)
+    }
+  }
+
+  async function handleInjectOne(field: FormField) {
+    const answer = essayAnswers?.[field.selector]
+    if (!answer) return
+    setInjectingSelector(field.selector)
+    try {
+      await chrome.runtime.sendMessage({ type: 'INJECT_FIELDS', payload: { [field.selector]: answer } })
+    } finally {
+      setInjectingSelector(null)
+    }
+  }
+
+  async function handleInjectAll() {
+    if (!essayAnswers) return
+    setInjectingAll(true)
+    try {
+      await chrome.runtime.sendMessage({ type: 'INJECT_FIELDS', payload: essayAnswers })
+    } finally {
+      setInjectingAll(false)
+    }
+  }
+
   const activeDoc = view === 'cv' ? (docs?.cv ?? '') : (docs?.coverLetter ?? '')
   const handleChange = view === 'cv' ? handleCvChange : handleCoverChange
   const docLabel = view === 'cv' ? 'CV' : 'cover letter'
   const missingMode = view === 'cv' ? 'cv' : 'cover-letter'
   const docTitle = view === 'cv' ? 'CV' : 'Cover Letter'
 
+  const tabs: [DocView, string][] = [
+    ['cv', 'CV / Résumé'],
+    ['cover', 'Cover Letter'],
+    ...(essayFields.length > 0 ? [['questions', 'Questions'] as [DocView, string]] : []),
+    ['history', 'History'],
+  ]
+
   return (
     <div className="h-full flex flex-col">
       {/* Sub-tab */}
       <div className="flex border-b border-slate-200 dark:border-white/5 bg-white dark:bg-[#16181f] shrink-0">
-        {([['cv', 'CV / Résumé'], ['cover', 'Cover Letter'], ['history', 'History']] as [DocView, string][]).map(([v, label]) => (
+        {tabs.map(([v, label]) => (
           <button
             key={v}
             onClick={() => { setView(v); setHistoryPreview(null) }}
@@ -135,9 +196,87 @@ export default function DocumentsTab({ docs, job, generating, onDocsChange, onOp
                 {history.length}
               </span>
             )}
+            {v === 'questions' && (
+              <span className="ml-1 text-[9px] bg-amber-500/20 text-amber-500 rounded-full px-1.5 py-0.5">
+                {essayFields.length}
+              </span>
+            )}
           </button>
         ))}
       </div>
+
+      {/* Questions view */}
+      {view === 'questions' && (
+        <div className="flex-1 overflow-y-auto">
+          <div className="p-4 space-y-3">
+            {!essayAnswers && (
+              <button
+                onClick={handleGenerateEssayAnswers}
+                disabled={generatingEssays || !job}
+                className="btn-primary w-full flex items-center justify-center gap-2"
+              >
+                {generatingEssays && <Spinner className="w-3 h-3" />}
+                {generatingEssays ? 'Generating answers...' : `Answer ${essayFields.length} question${essayFields.length !== 1 ? 's' : ''}`}
+              </button>
+            )}
+
+            {essayAnswers && (
+              <>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleGenerateEssayAnswers}
+                    disabled={generatingEssays}
+                    className="btn-ghost text-xs flex-1 flex items-center justify-center gap-1.5"
+                  >
+                    {generatingEssays && <Spinner className="w-2.5 h-2.5" />}
+                    {generatingEssays ? 'Regenerating...' : 'Regenerate all'}
+                  </button>
+                  <button
+                    onClick={handleInjectAll}
+                    disabled={injectingAll}
+                    className="btn-primary text-xs flex-1 flex items-center justify-center gap-1.5"
+                  >
+                    {injectingAll && <Spinner className="w-2.5 h-2.5" />}
+                    {injectingAll ? 'Inserting...' : 'Insert all'}
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  {essayFields.map((field) => {
+                    const answer = essayAnswers[field.selector] ?? ''
+                    const hasAnswer = answer.trim().length > 0
+                    return (
+                      <div key={field.selector} className="bg-black/[0.02] dark:bg-white/[0.03] rounded-xl border border-slate-200 dark:border-white/5 p-3 space-y-2">
+                        <p className="text-xs font-medium text-slate-700 dark:text-slate-300 leading-snug">
+                          {field.label || field.name || field.id}
+                        </p>
+                        <textarea
+                          value={answer}
+                          onChange={e => setEssayAnswers(prev => ({ ...prev!, [field.selector]: e.target.value }))}
+                          placeholder={hasAnswer ? '' : 'No answer generated for this field'}
+                          className="input-base w-full h-28 resize-y text-xs font-mono"
+                          spellCheck
+                        />
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] text-slate-400">{field.selector}</span>
+                          <button
+                            onClick={() => handleInjectOne(field)}
+                            disabled={!hasAnswer || injectingSelector === field.selector}
+                            className="btn-primary text-[10px] px-3 py-1 flex items-center gap-1"
+                          >
+                            {injectingSelector === field.selector && <Spinner className="w-2 h-2" />}
+                            {injectingSelector === field.selector ? 'Inserting...' : 'Insert'}
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* History view */}
       {view === 'history' && (
@@ -170,8 +309,16 @@ export default function DocumentsTab({ docs, job, generating, onDocsChange, onOp
             </div>
           ) : (
             <div className="p-4 space-y-6">
+              <input
+                type="search"
+                value={historySearch}
+                onChange={e => { setHistorySearch(e.target.value); setHistoryPage({ cv: 0, coverLetter: 0 }) }}
+                placeholder="Search history…"
+                className="input-base text-xs px-2 py-1 w-full h-7"
+              />
               {(['cv', 'coverLetter'] as const).map(field => {
-                const entries = history.filter(e => e[field])
+                const hq = historySearch.trim().toLowerCase()
+                const entries = history.filter(e => e[field] && (!hq || e.jobTitle?.toLowerCase().includes(hq) || e.jobCompany?.toLowerCase().includes(hq)))
                 const label = field === 'cv' ? 'CVs' : 'Cover Letters'
                 const page = historyPage[field]
                 const totalPages = Math.ceil(entries.length / PAGE_SIZE)
@@ -228,7 +375,7 @@ export default function DocumentsTab({ docs, job, generating, onDocsChange, onOp
       )}
 
       {/* Editor or empty state */}
-      {view !== 'history' && <div className="flex-1 relative overflow-hidden">
+      {view !== 'history' && view !== 'questions' && <div className="flex-1 relative overflow-hidden">
         {activeDoc ? (
           editing ? (
             <textarea
@@ -277,8 +424,8 @@ export default function DocumentsTab({ docs, job, generating, onDocsChange, onOp
         )}
       </div>}
 
-      {/* Footer actions — hidden in history view */}
-      {view !== 'history' && !historyPreview && (
+      {/* Footer actions — hidden in history + questions views */}
+      {view !== 'history' && view !== 'questions' && !historyPreview && (
         <div className="shrink-0 border-t border-slate-200 dark:border-white/5 bg-white dark:bg-[#16181f] px-4 py-3 flex items-center gap-2">
           <button onClick={onOpenChat} className="btn-secondary flex-1 text-xs">
             Refine in chat

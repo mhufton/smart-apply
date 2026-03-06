@@ -382,7 +382,7 @@ export function buildDocsPrompt(
 Produce only a CV:
 
 ## CV
-[Tailored CV in clean markdown. Use ## for section headings, bullet points for experience. Hard limit: 1–2 pages. Max 3 bullets per role. Omit roles older than 10 years unless exceptional. No filler, no objectives section, no "References available on request". Do not use blank lines between bullet points or between roles — no extra line breaks anywhere in the CV.]
+[Tailored CV in clean markdown. Use ## for section headings, bullet points for experience. Hard limit: 1–2 pages. Max 3 bullets per role. Omit roles older than 10 years unless exceptional. No filler, no objectives section, no "References available on request". Do not use blank lines between bullet points, between roles, or between sections — no extra line breaks anywhere in the CV. Each section heading (##) should immediately follow the previous section's last line with no blank line separator.]
 
 Do not include a cover letter or any other text.`
       : mode === 'cover-letter'
@@ -397,7 +397,7 @@ Do not include a CV or any other text.`
 Produce two sections separated exactly as shown:
 
 ## CV
-[Tailored CV in clean markdown. Use ## for section headings, bullet points for experience. Hard limit: 1–2 pages. Max 3 bullets per role. Omit roles older than 10 years unless exceptional. No filler, no objectives section, no "References available on request". Do not use blank lines between bullet points or between roles — no extra line breaks anywhere in the CV.]
+[Tailored CV in clean markdown. Use ## for section headings, bullet points for experience. Hard limit: 1–2 pages. Max 3 bullets per role. Omit roles older than 10 years unless exceptional. No filler, no objectives section, no "References available on request". Do not use blank lines between bullet points, between roles, or between sections — no extra line breaks anywhere in the CV. Each section heading (##) should immediately follow the previous section's last line with no blank line separator.]
 
 ## Cover Letter
 [3 paragraphs max. Professional but not stiff. Don't start with "I am writing to apply for". No more than 350 words.]
@@ -506,7 +506,7 @@ export function buildFormFillPrompt(
   if (!fillable.length) return ''
 
   const fieldList = fillable.map(f =>
-    `- selector: "${f.selector}" | label: "${f.label}" | type: ${f.type}${f.required ? ' | required' : ''}`
+    `- selector: "${f.selector}" | label: "${f.label}" | type: ${f.type}${f.required ? ' | required' : ''}${f.isEssayQuestion ? ' | essay' : ''}`
   ).join('\n')
 
   const basics = profile.basics
@@ -535,7 +535,7 @@ ${fieldList}
 Return ONLY a valid JSON object mapping each selector to the value to fill in.
 Only include fields you can confidently fill — omit fields where you have no relevant data.
 For select fields, return the most appropriate option value as a plain string.
-For textarea fields containing "cover", "letter", or "statement", use the full cover letter text.
+For fields marked as essay, write a thoughtful answer in full sentences using the cover letter and candidate data as context. For cover letter fields, use the full cover letter text verbatim.
 Do not include file upload fields.
 
 Example output:

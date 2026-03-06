@@ -6,9 +6,9 @@ import {
   fmtYears,
   parseDocsResponse,
   buildFitPrompt,
-
   buildFormFillPrompt,
 } from '../panel/lib/claude'
+import { classifyEssayQuestion } from '../content/index'
 import type { ScrapedJob, MasterProfile, FormField } from '../types'
 
 // ── parseMonthYear ────────────────────────────────────────────────────────────
@@ -59,13 +59,11 @@ describe('parseDurationMonths', () => {
 
   it('parses a fixed date range', () => {
     const months = parseDurationMonths('Jun 2023 – Jan 2025')
-    // Jun 2023 to Jan 2025 = 19 months
     expect(months).toBeGreaterThanOrEqual(18)
     expect(months).toBeLessThanOrEqual(20)
   })
 
   it('parses a date range with Present', () => {
-    // Just verify it returns a positive number (since "Present" is dynamic)
     const months = parseDurationMonths('Jan 2023 – Present')
     expect(months).toBeGreaterThan(0)
   })
@@ -76,7 +74,6 @@ describe('parseDurationMonths', () => {
   })
 
   it('prefers explicit duration over date range when both exist', () => {
-    // String contains "2 yr" → should use that, not compute from the dates
     expect(parseDurationMonths('Jan 2022 – Jan 2024 · 2 yrs')).toBe(24)
   })
 })
@@ -149,6 +146,59 @@ describe('parseDocsResponse', () => {
   })
 })
 
+// ── classifyEssayQuestion ─────────────────────────────────────────────────────
+
+describe('classifyEssayQuestion', () => {
+  it('returns false for a short basic text field', () => {
+    expect(classifyEssayQuestion('Full Name', 'text', true)).toBe(false)
+  })
+
+  it('returns true for a cover letter textarea', () => {
+    expect(classifyEssayQuestion('Cover Letter', 'textarea', false)).toBe(true)
+  })
+
+  it('returns true for a textarea with describe keyword', () => {
+    expect(classifyEssayQuestion('Please describe your approach to problem solving', 'textarea', false)).toBe(true)
+  })
+
+  it('returns false for a long text field with no keyword (not textarea)', () => {
+    // Rule 3 only applies to textarea — text inputs need keyword match
+    expect(classifyEssayQuestion('Years of experience in software engineering', 'text', false)).toBe(false)
+  })
+
+  it('returns false for a checkbox regardless of label', () => {
+    expect(classifyEssayQuestion('Do you require visa sponsorship?', 'checkbox', false)).toBe(false)
+  })
+
+  it('returns true for a bare required textarea with no label', () => {
+    expect(classifyEssayQuestion('Field 3', 'textarea', true)).toBe(true)
+  })
+
+  it('returns false for a bare unrequired textarea', () => {
+    expect(classifyEssayQuestion('Field 5', 'textarea', false)).toBe(false)
+  })
+
+  it('returns true for a text input with a why-keyword', () => {
+    expect(classifyEssayQuestion(
+      'Why do you want to work at Acme and what makes you a strong fit for this role?',
+      'text',
+      false
+    )).toBe(true)
+  })
+
+  it('returns false for a select field', () => {
+    expect(classifyEssayQuestion('What is your preferred start date?', 'select', false)).toBe(false)
+  })
+
+  it('returns false for a long-label required checkbox (Rule 1 wins)', () => {
+    expect(classifyEssayQuestion(
+      'I confirm I have read and accept the terms and conditions of this application',
+      'checkbox',
+      true
+    )).toBe(false)
+  })
+})
+
 // ── buildFitPrompt ────────────────────────────────────────────────────────────
 
 const mockJob: ScrapedJob = {
@@ -209,9 +259,9 @@ describe('buildFitPrompt', () => {
 
 describe('buildFormFillPrompt', () => {
   const fields: FormField[] = [
-    { label: 'Full Name', type: 'text', name: 'full_name', id: 'full_name', required: true, selector: '#full_name' },
-    { label: 'Email', type: 'text', name: 'email', id: 'email', required: true, selector: '#email' },
-    { label: 'Upload CV', type: 'file', name: 'cv_upload', id: 'cv_upload', required: false, selector: '#cv_upload' },
+    { label: 'Full Name', type: 'text', name: 'full_name', id: 'full_name', required: true, isEssayQuestion: false, selector: '#full_name' },
+    { label: 'Email', type: 'text', name: 'email', id: 'email', required: true, isEssayQuestion: false, selector: '#email' },
+    { label: 'Upload CV', type: 'file', name: 'cv_upload', id: 'cv_upload', required: false, isEssayQuestion: false, selector: '#cv_upload' },
   ]
 
   it('excludes file fields from the prompt', () => {
@@ -231,9 +281,18 @@ describe('buildFormFillPrompt', () => {
     expect(prompt).toContain('jane@example.com')
   })
 
+  it('marks essay fields with | essay in the field list', () => {
+    const withEssay: FormField[] = [
+      ...fields,
+      { label: 'Why do you want to work here?', type: 'textarea', name: 'why', id: 'why', required: true, isEssayQuestion: true, selector: '#why' },
+    ]
+    const prompt = buildFormFillPrompt(withEssay, mockProfile, 'Cover letter text')
+    expect(prompt).toContain('| essay')
+  })
+
   it('returns empty string when all fields are non-fillable', () => {
     const onlyFile: FormField[] = [
-      { label: 'Resume', type: 'file', name: 'resume', id: 'resume', required: false, selector: '#resume' },
+      { label: 'Resume', type: 'file', name: 'resume', id: 'resume', required: false, isEssayQuestion: false, selector: '#resume' },
     ]
     expect(buildFormFillPrompt(onlyFile, mockProfile, '')).toBe('')
   })
