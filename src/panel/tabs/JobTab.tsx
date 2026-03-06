@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { ScrapedJob, FitAnalysis, GeneratedDocuments } from '../../types'
 import { callHaiku, callSonnet, buildFitPrompt, buildDocsPrompt, buildJobParsePrompt, parseDocsResponse, type DocMode } from '../lib/claude'
+import { getAutoAnalyze } from './SettingsTab'
 import { loadProfile } from '../lib/storage'
 import ErrorBanner from '../components/ErrorBanner'
 import Spinner from '../components/Spinner'
@@ -64,6 +65,18 @@ export default function JobTab({ job, fit, onJobScraped, onFitAnalyzed, onGenera
       }
 
       onJobScraped(job)
+
+      if (await getAutoAnalyze()) {
+        setAnalyzing(true)
+        try {
+          const profile = await loadProfile()
+          const fitPrompt = buildFitPrompt(job, profile)
+          let fitRaw = ''
+          await callHaiku([{ role: 'user', content: fitPrompt }], chunk => { fitRaw += chunk })
+          onFitAnalyzed(parseFitResponse(fitRaw))
+        } catch { /* fit failure doesn't block the scrape result */ }
+        finally { setAnalyzing(false) }
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Scrape failed.')
     } finally {
