@@ -48,6 +48,7 @@ export default function ProfileTab() {
         location: incoming.basics?.location || existing.basics.location,
         linkedin: incoming.basics?.linkedin || existing.basics.linkedin,
         website: incoming.basics?.website || existing.basics.website,
+        customFields: existing.basics.customFields,
       },
       summary: incoming.summary || existing.summary,
       experiences: incoming.experiences?.length ? incoming.experiences : existing.experiences,
@@ -308,6 +309,48 @@ export default function ProfileTab() {
                 </div>
               </div>
             ))}
+
+            {/* Custom fields */}
+            {(profile.basics.customFields ?? []).map((cf, i) => (
+              <div key={i} className="flex items-center gap-1.5">
+                <input
+                  type="text"
+                  value={cf.label}
+                  onChange={e => {
+                    const next = [...(profile.basics.customFields ?? [])]
+                    next[i] = { ...cf, label: e.target.value }
+                    updateBasics({ customFields: next })
+                  }}
+                  placeholder="Field name"
+                  className="input-base w-28 text-xs"
+                />
+                <input
+                  type="text"
+                  value={cf.value}
+                  onChange={e => {
+                    const next = [...(profile.basics.customFields ?? [])]
+                    next[i] = { ...cf, value: e.target.value }
+                    updateBasics({ customFields: next })
+                  }}
+                  placeholder="Value"
+                  className="input-base flex-1 text-xs"
+                />
+                <CopyFieldButton value={cf.value} />
+                <button
+                  onClick={() => {
+                    const next = (profile.basics.customFields ?? []).filter((_, j) => j !== i)
+                    updateBasics({ customFields: next })
+                  }}
+                  className="text-xs text-red-400 hover:text-red-300 px-1"
+                >✕</button>
+              </div>
+            ))}
+            <button
+              onClick={() => updateBasics({ customFields: [...(profile.basics.customFields ?? []), { label: '', value: '' }] })}
+              className="text-[10px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+            >
+              + Add field
+            </button>
           </div>
         </Section>
 

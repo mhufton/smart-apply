@@ -36,6 +36,7 @@ export interface MasterProfile {
     location: string
     linkedin: string
     website?: string
+    customFields?: { label: string; value: string }[]
   }
   summary: string
   experiences: Experience[]
