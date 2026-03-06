@@ -88,6 +88,10 @@ async function streamOpenAICompat(
   maxTokens: number
 ): Promise<void> {
   const base = endpoint.replace(/\/$/, '')
+  const isLocal = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/.test(base)
+  if (!isLocal && !base.startsWith('https://')) {
+    throw new Error('Endpoint must use HTTPS. Update it in the Settings tab.')
+  }
   const response = await fetch(`${base}/chat/completions`, {
     method: 'POST',
     headers: {

@@ -56,6 +56,12 @@ export default function SettingsTab() {
     const key = keyInput.trim()
     if (!key) { setError('Enter your API key.'); return }
     if (!endpoint.trim()) { setError('Enter the endpoint URL.'); return }
+    const trimmedEndpoint = endpoint.trim()
+    const isLocal = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/.test(trimmedEndpoint)
+    if (!isLocal && !trimmedEndpoint.startsWith('https://')) {
+      setError('Endpoint must use HTTPS to protect your API key.')
+      return
+    }
 
     setStatus('saving')
     setError('')
