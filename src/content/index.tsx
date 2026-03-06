@@ -22,6 +22,55 @@ function detectPlatform(): ScrapedJob['platform'] {
   return 'unknown'
 }
 
+// ── Essay question detection ──────────────────────────────────────────────────
+
+const ESSAY_KEYWORDS = [
+  'cover letter',
+  'personal statement',
+  'why do you want',
+  'why are you',
+  'why us',
+  'why this',
+  'tell us',
+  'tell me',
+  'describe',
+  'explain',
+  'what motivates',
+  'what interests',
+  'additional information',
+  'additional comments',
+  'anything else',
+  'background',
+  'experience with',
+  'how have you',
+  'how do you',
+  'what would you',
+  'please share',
+  'please describe',
+  'please explain',
+]
+
+export function classifyEssayQuestion(
+  label: string,
+  type: FormField['type'],
+  required: boolean
+): boolean {
+  // Rule 1 — non-prose element types can never be essay questions
+  if (type === 'checkbox' || type === 'radio' || type === 'select' || type === 'file') return false
+
+  // Rule 2 — keyword match (case-insensitive substring)
+  const lower = label.toLowerCase()
+  if (ESSAY_KEYWORDS.some(kw => lower.includes(kw))) return true
+
+  // Rule 3 — long label on a textarea (explanatory question text)
+  if (type === 'textarea' && label.length > 60) return true
+
+  // Rule 4 — bare required textarea with no real label
+  if (type === 'textarea' && required && /^(Field \d+)?$/.test(label.trim())) return true
+
+  return false
+}
+
 function scrapeFormFields(): FormField[] {
   const fields: FormField[] = []
   const inputs = document.querySelectorAll<HTMLElement>('input, textarea, select')
@@ -60,12 +109,14 @@ function scrapeFormFields(): FormField[] {
       else if (t === 'radio') type = 'radio'
     }
 
+    const required = (input as HTMLInputElement).required
     fields.push({
       label,
       type,
       name: input.name,
       id,
-      required: (input as HTMLInputElement).required,
+      required,
+      isEssayQuestion: classifyEssayQuestion(label, type, required),
       selector: id ? `#${id}` : `[name="${input.name}"]`,
     })
   })

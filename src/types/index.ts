@@ -53,6 +53,7 @@ export interface FormField {
   name: string
   id: string
   required: boolean
+  isEssayQuestion: boolean
   selector: string
 }
 

@@ -506,7 +506,7 @@ export function buildFormFillPrompt(
   if (!fillable.length) return ''
 
   const fieldList = fillable.map(f =>
-    `- selector: "${f.selector}" | label: "${f.label}" | type: ${f.type}${f.required ? ' | required' : ''}`
+    `- selector: "${f.selector}" | label: "${f.label}" | type: ${f.type}${f.required ? ' | required' : ''}${f.isEssayQuestion ? ' | essay' : ''}`
   ).join('\n')
 
   const basics = profile.basics
@@ -535,7 +535,7 @@ ${fieldList}
 Return ONLY a valid JSON object mapping each selector to the value to fill in.
 Only include fields you can confidently fill — omit fields where you have no relevant data.
 For select fields, return the most appropriate option value as a plain string.
-For textarea fields containing "cover", "letter", or "statement", use the full cover letter text.
+For fields marked as essay, write a thoughtful answer in full sentences using the cover letter and candidate data as context. For cover letter fields, use the full cover letter text verbatim.
 Do not include file upload fields.
 
 Example output:
