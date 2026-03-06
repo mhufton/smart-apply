@@ -296,13 +296,16 @@ export default function ProfileTab() {
             {(['name', 'email', 'phone', 'location', 'linkedin', 'website'] as const).map(field => (
               <div key={field}>
                 <label className="text-xs text-slate-500 capitalize">{field}</label>
-                <input
-                  type="text"
-                  value={profile.basics[field] ?? ''}
-                  onChange={e => updateBasics({ [field]: e.target.value })}
-                  className="input-base w-full"
-                  placeholder={field}
-                />
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="text"
+                    value={profile.basics[field] ?? ''}
+                    onChange={e => updateBasics({ [field]: e.target.value })}
+                    className="input-base flex-1"
+                    placeholder={field}
+                  />
+                  <CopyFieldButton value={profile.basics[field] ?? ''} />
+                </div>
               </div>
             ))}
           </div>
@@ -556,6 +559,36 @@ export default function ProfileTab() {
 
       </div>
     </div>
+  )
+}
+
+function CopyFieldButton({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false)
+  function handleCopy() {
+    if (!value) return
+    navigator.clipboard.writeText(value).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    }).catch(console.error)
+  }
+  return (
+    <button
+      onClick={handleCopy}
+      disabled={!value}
+      title="Copy"
+      className="shrink-0 p-1.5 rounded transition-colors text-indigo-500 hover:text-indigo-400 disabled:opacity-25 disabled:cursor-default"
+    >
+      {copied ? (
+        <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l3.5 3.5L13 4.5" />
+        </svg>
+      ) : (
+        <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <rect x="5" y="5" width="8" height="9" rx="1.5" />
+          <path strokeLinecap="round" d="M11 5V4a1.5 1.5 0 00-1.5-1.5h-6A1.5 1.5 0 002 4v7A1.5 1.5 0 003.5 12.5H5" />
+        </svg>
+      )}
+    </button>
   )
 }
 

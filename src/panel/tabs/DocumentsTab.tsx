@@ -119,11 +119,11 @@ export default function DocumentsTab({ docs, job, generating, onDocsChange, onOp
   }
 
   async function handleGenerateEssayAnswers() {
-    if (!job || !docs) return
+    if (!job) return
     setGeneratingEssays(true)
     try {
       const profile = await loadProfile()
-      const prompt = buildFormFillPrompt(essayFields, profile, docs.coverLetter)
+      const prompt = buildFormFillPrompt(essayFields, profile, docs?.coverLetter ?? '')
       if (!prompt) return
 
       let raw = ''
@@ -208,16 +208,10 @@ export default function DocumentsTab({ docs, job, generating, onDocsChange, onOp
       {view === 'questions' && (
         <div className="flex-1 overflow-y-auto">
           <div className="p-4 space-y-3">
-            {!docs && (
-              <p className="text-xs text-slate-400 dark:text-slate-500 text-center py-4">
-                Generate your CV or cover letter first — answers are tailored using that content.
-              </p>
-            )}
-
-            {docs && !essayAnswers && (
+            {!essayAnswers && (
               <button
                 onClick={handleGenerateEssayAnswers}
-                disabled={generatingEssays}
+                disabled={generatingEssays || !job}
                 className="btn-primary w-full flex items-center justify-center gap-2"
               >
                 {generatingEssays && <Spinner className="w-3 h-3" />}
