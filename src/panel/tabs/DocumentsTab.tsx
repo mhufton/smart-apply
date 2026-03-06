@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import type { GeneratedDocuments, ScrapedJob, DocHistoryEntry } from '../../types'
 import Spinner from '../components/Spinner'
+import DOMPurify from 'dompurify'
 import { renderMarkdown } from '../lib/markdown'
 import { loadDocHistory, deleteDocHistoryEntry, appendDocHistory, loadProfile } from '../lib/storage'
 import { callSmall, buildFormFillPrompt } from '../lib/claude'
@@ -15,6 +16,10 @@ interface Props {
 }
 
 type DocView = 'cv' | 'cover' | 'history'
+
+function safeHtml(markdown: string): string {
+  return DOMPurify.sanitize(renderMarkdown(markdown))
+}
 
 export default function DocumentsTab({ docs, job, generating, onDocsChange, onOpenChat, onGenerateMissing }: Props) {
   const [view, setView] = useState<DocView>('cv')
@@ -167,7 +172,7 @@ export default function DocumentsTab({ docs, job, generating, onDocsChange, onOp
               </div>
               <div
                 className="flex-1 overflow-y-auto p-5 bg-white dark:bg-[#0f1117] prose-cv text-sm"
-                dangerouslySetInnerHTML={{ __html: renderMarkdown(historyPreview.entry[historyPreview.field]) }}
+                dangerouslySetInnerHTML={{ __html: safeHtml(historyPreview.entry[historyPreview.field]) }}
               />
             </div>
           ) : (
@@ -244,7 +249,7 @@ export default function DocumentsTab({ docs, job, generating, onDocsChange, onOp
             <div
               className="w-full h-full overflow-y-auto p-5 bg-white dark:bg-[#0f1117]
                          prose-cv text-slate-800 dark:text-slate-200 text-sm leading-relaxed"
-              dangerouslySetInnerHTML={{ __html: renderMarkdown(activeDoc) }}
+              dangerouslySetInnerHTML={{ __html: safeHtml(activeDoc) }}
             />
           )
         ) : (
