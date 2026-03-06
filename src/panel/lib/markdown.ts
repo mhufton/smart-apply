@@ -2,6 +2,14 @@
  * Lightweight markdown → HTML renderer for CV/cover letter format.
  * Handles headings, bold, italic, bullet lists, horizontal rules, and paragraphs.
  */
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+}
+
 export function renderMarkdown(md: string): string {
   const lines = md.split('\n')
   const out: string[] = []
@@ -12,10 +20,7 @@ export function renderMarkdown(md: string): string {
   }
 
   function inline(text: string): string {
-    return text
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
+    return escapeHtml(text)
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.+?)\*/g, '<em>$1</em>')
       .replace(/`(.+?)`/g, '<code>$1</code>')
@@ -58,7 +63,7 @@ export function markdownToFullPage(md: string, title = 'Document'): string {
 <html>
 <head>
   <meta charset="utf-8">
-  <title>${title}</title>
+  <title>${escapeHtml(title)}</title>
   <style>
     body {
       font-family: 'Georgia', serif;
