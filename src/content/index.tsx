@@ -18,6 +18,7 @@ function detectPlatform(): ScrapedJob['platform'] {
   if (host.includes('linkedin.com')) return 'linkedin'
   if (host.includes('indeed.com')) return 'indeed'
   if (host.includes('amazon.jobs')) return 'amazon'
+  if (host.includes('ziprecruiter.com')) return 'ziprecruiter'
   return 'unknown'
 }
 
@@ -74,15 +75,64 @@ function scrapeFormFields(): FormField[] {
 
 // ── Job scrape entry ──────────────────────────────────────────────────────────
 
-function scrapeJob(): ScrapedJob & { _rawText: string } {
+async function scrapeJob(): Promise<ScrapedJob & { _rawText: string }> {
   const platform = detectPlatform()
 
   // Grab the richest text content available — Haiku will extract structure in the panel
-  const mainEl = document.querySelector('main')
-    ?? document.querySelector('[role="main"]')
-    ?? document.querySelector('article')
-    ?? document.body
-  const _rawText = mainEl.innerText
+  let mainEl: Element
+
+  if (platform === 'ziprecruiter') {
+    // ZipRecruiter renders job details in a client-side modal/pane.
+    // Try targeted selectors; if none match immediately, poll briefly
+    // to allow React rendering to complete (especially on search results pages).
+    const ZR_SELECTORS = [
+      '[data-testid="job-details-pane"]',
+      '.job_details_container',
+      '.jobDescriptionSection',
+      '[class*="JobDescription"]',
+      '[role="dialog"]',
+    ]
+
+    const findZR = () => {
+      for (const sel of ZR_SELECTORS) {
+        const el = document.querySelector(sel)
+        if (el) return el
+      }
+      return null
+    }
+
+    const found = findZR()
+    if (found) {
+      mainEl = found
+    } else {
+      // Poll up to 1500ms for the modal to render (SPA navigation)
+      mainEl = await new Promise<Element>((resolve) => {
+        const deadline = Date.now() + 1500
+        const tick = () => {
+          const el = findZR()
+          if (el) { resolve(el); return }
+          if (Date.now() >= deadline) {
+            resolve(
+              document.querySelector('main') ??
+              document.querySelector('[role="main"]') ??
+              document.querySelector('article') ??
+              document.body
+            )
+            return
+          }
+          setTimeout(tick, 100)
+        }
+        setTimeout(tick, 100)
+      })
+    }
+  } else {
+    mainEl = document.querySelector('main')
+      ?? document.querySelector('[role="main"]')
+      ?? document.querySelector('article')
+      ?? document.body
+  }
+
+  const _rawText = (mainEl as HTMLElement).innerText
     .replace(/\s{3,}/g, '\n\n')
     .trim()
     .slice(0, 10000)
@@ -206,9 +256,8 @@ function injectFields(values: Record<string, string>) {
 
 chrome.runtime.onMessage.addListener((message: ExtMessage, _sender, sendResponse) => {
   if (message.type === 'SCRAPE_JOB') {
-    const job = scrapeJob()
-    sendResponse(job)
-    return false
+    scrapeJob().then(sendResponse)
+    return true  // keep channel open for async response
   }
   if (message.type === 'SCRAPE_PROFILE') {
     const profile = scrapeLinkedInProfile()
