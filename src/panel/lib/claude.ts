@@ -254,6 +254,7 @@ export function buildFitPrompt(job: ScrapedJob, profile: MasterProfile): string 
 
 ## Candidate Profile
 Name: ${profile.basics.name}
+${(profile.basics.customFields ?? []).filter(f => f.label && f.value).map(f => `${f.label}: ${f.value}`).join('\n')}
 Summary: ${profile.summary}
 Total professional experience: ${totalYoE}
 Current role: ${currentTenure}
@@ -421,10 +422,15 @@ Do not include any other text outside these two sections.`
     return `${header}\n${roleLines}`
   }).join('\n\n')
 
+  const customBasics = (profile.basics.customFields ?? [])
+    .filter(f => f.label && f.value)
+    .map(f => `${f.label}: ${f.value}`)
+    .join('\n')
+
   const profileBlock = `Name: ${profile.basics.name}
 Location: ${profile.basics.location || 'not specified'}
 LinkedIn: ${profile.basics.linkedin || 'not specified'}
-Summary: ${profile.summary || 'not provided'}
+${customBasics ? customBasics + '\n' : ''}Summary: ${profile.summary || 'not provided'}
 
 Experience:
 ${experienceBlock}
@@ -513,6 +519,10 @@ export function buildFormFillPrompt(
   const contextAnswers = (profile.contextNotes ?? [])
     .map(n => `${n.label ? n.label + ': ' : ''}${n.content}`)
     .join('\n')
+  const customBasicsLines = (basics.customFields ?? [])
+    .filter(f => f.label && f.value)
+    .map(f => `${f.label}: ${f.value}`)
+    .join('\n')
 
   return `You are filling in a job application form. Map the form fields below to the candidate's data.
 
@@ -522,8 +532,7 @@ Email: ${basics.email}
 Phone: ${basics.phone}
 Location: ${basics.location}
 LinkedIn: ${basics.linkedin}
-${basics.website ? `Website: ${basics.website}` : ''}
-${contextAnswers ? `\nAdditional info (use for questions about notice period, right to work, salary, etc.):\n${contextAnswers}` : ''}
+${basics.website ? `Website: ${basics.website}\n` : ''}${customBasicsLines ? customBasicsLines + '\n' : ''}${contextAnswers ? `\nAdditional info (use for questions about notice period, right to work, salary, etc.):\n${contextAnswers}` : ''}
 
 ## Cover letter (use for any cover letter or personal statement field)
 ${coverLetter.slice(0, 1500)}
