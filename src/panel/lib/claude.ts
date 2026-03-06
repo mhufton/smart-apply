@@ -186,7 +186,7 @@ export const callClaude = callSmall
 
 const MONTH_NAMES = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec']
 
-function parseMonthYear(str: string): number | null {
+export function parseMonthYear(str: string): number | null {
   const m = str.trim().toLowerCase().match(/^(\w{3})\s+(\d{4})$/)
   if (!m) return null
   const mo = MONTH_NAMES.indexOf(m[1])
@@ -194,7 +194,7 @@ function parseMonthYear(str: string): number | null {
   return new Date(parseInt(m[2]), mo, 1).getTime()
 }
 
-function parseDurationMonths(dates: string): number {
+export function parseDurationMonths(dates: string): number {
   // Prefer explicit duration string: "2 yrs 10 mos", "11 mos", etc.
   const yrMatch = dates.match(/(\d+)\s*yr/)
   const moMatch = dates.match(/(\d+)\s*mo/)
@@ -211,7 +211,7 @@ function parseDurationMonths(dates: string): number {
   return 0
 }
 
-function fmtYears(months: number): string {
+export function fmtYears(months: number): string {
   const yrs = Math.floor(months / 12)
   const mos = months % 12
   if (yrs === 0) return `${mos} month${mos !== 1 ? 's' : ''}`
