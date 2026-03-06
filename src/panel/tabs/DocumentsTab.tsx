@@ -34,7 +34,11 @@ export default function DocumentsTab({ docs, job, generating, onDocsChange, onOp
   const PAGE_SIZE = 5
 
   useEffect(() => {
-    loadDocHistory().then(setHistory)
+    loadDocHistory().then(h => {
+      setHistory(h)
+      // If there's no active session doc but history exists, land on History tab
+      if (!docs && h.length > 0) setView('history')
+    })
     loadProfile().then(p => {
       const name = p.basics.name.trim()
       setLastName(name.split(' ').pop() ?? name)
@@ -70,25 +74,14 @@ export default function DocumentsTab({ docs, job, generating, onDocsChange, onOp
     }
   }
 
-  if (!docs) {
-    return (
-      <div className="h-full flex items-center justify-center text-center px-8">
-        <div>
-          <p className="text-slate-400 dark:text-slate-500 text-sm mb-1">No documents yet</p>
-          <p className="text-slate-400 dark:text-slate-600 text-xs">
-            Scrape a job on the Job tab and click Generate
-          </p>
-        </div>
-      </div>
-    )
-  }
-
   function handleCvChange(value: string) {
-    onDocsChange({ ...docs!, cv: value })
+    if (!docs) return
+    onDocsChange({ ...docs, cv: value })
   }
 
   function handleCoverChange(value: string) {
-    onDocsChange({ ...docs!, coverLetter: value })
+    if (!docs) return
+    onDocsChange({ ...docs, coverLetter: value })
   }
 
   async function handleInjectIntoForm() {
@@ -115,7 +108,7 @@ export default function DocumentsTab({ docs, job, generating, onDocsChange, onOp
     }
   }
 
-  const activeDoc = view === 'cv' ? docs.cv : docs.coverLetter
+  const activeDoc = view === 'cv' ? (docs?.cv ?? '') : (docs?.coverLetter ?? '')
   const handleChange = view === 'cv' ? handleCvChange : handleCoverChange
   const docLabel = view === 'cv' ? 'CV' : 'cover letter'
   const missingMode = view === 'cv' ? 'cv' : 'cover-letter'
