@@ -31,6 +31,7 @@ export default function DocumentsTab({ docs, job, generating, onDocsChange, onOp
   const [saved, setSaved] = useState(false)
   const [lastName, setLastName] = useState('')
   const [historyPage, setHistoryPage] = useState<Record<'cv' | 'coverLetter', number>>({ cv: 0, coverLetter: 0 })
+  const [historySearch, setHistorySearch] = useState('')
   const PAGE_SIZE = 5
 
   // Essay questions state
@@ -308,8 +309,16 @@ export default function DocumentsTab({ docs, job, generating, onDocsChange, onOp
             </div>
           ) : (
             <div className="p-4 space-y-6">
+              <input
+                type="search"
+                value={historySearch}
+                onChange={e => { setHistorySearch(e.target.value); setHistoryPage({ cv: 0, coverLetter: 0 }) }}
+                placeholder="Search history…"
+                className="input-base text-xs px-2 py-1 w-full h-7"
+              />
               {(['cv', 'coverLetter'] as const).map(field => {
-                const entries = history.filter(e => e[field])
+                const hq = historySearch.trim().toLowerCase()
+                const entries = history.filter(e => e[field] && (!hq || e.jobTitle?.toLowerCase().includes(hq) || e.jobCompany?.toLowerCase().includes(hq)))
                 const label = field === 'cv' ? 'CVs' : 'Cover Letters'
                 const page = historyPage[field]
                 const totalPages = Math.ceil(entries.length / PAGE_SIZE)

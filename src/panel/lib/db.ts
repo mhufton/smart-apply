@@ -94,6 +94,34 @@ export async function upsertApplication(
   }
 }
 
+export async function addManualApplication(fields: {
+  jobTitle: string
+  jobCompany: string
+  jobLocation?: string
+  status: ApplicationEntry['status']
+}): Promise<ApplicationEntry> {
+  const now = Date.now()
+  const entry: ApplicationEntry = {
+    id: crypto.randomUUID(),
+    createdAt: now,
+    updatedAt: now,
+    jobTitle: fields.jobTitle,
+    jobCompany: fields.jobCompany,
+    jobLocation: fields.jobLocation,
+    jobUrl: `manual:${crypto.randomUUID()}`,
+    jobPlatform: 'unknown',
+    status: fields.status,
+    cvSnapshot: '',
+    coverLetterSnapshot: '',
+    notes: '',
+    interviews: [],
+    contacts: [],
+    tags: [],
+  }
+  await db.applications.add(entry)
+  return entry
+}
+
 export async function updateApplicationStatus(
   id: string,
   status: ApplicationEntry['status']
