@@ -383,7 +383,29 @@ export function buildDocsPrompt(
 Produce only a CV:
 
 ## CV
-[Tailored CV in clean markdown. Use ## for section headings, bullet points for experience. Hard limit: 1–2 pages. Max 3 bullets per role. Omit roles older than 10 years unless exceptional. No filler, no objectives section, no "References available on request". Do not use blank lines between bullet points, between roles, or between sections — no extra line breaks anywhere in the CV. Each section heading (##) should immediately follow the previous section's last line with no blank line separator.]
+[Tailored CV in clean markdown. Use ## for section headings, bullet points for experience. Hard limit: 1–2 pages. Max 3 bullets per role. Omit roles older than 10 years unless exceptional. No filler, no objectives section, no "References available on request".
+
+Do not use blank lines between bullet points, between roles, or between sections — no extra line breaks anywhere in the CV. Each section heading (##) should immediately follow the previous section's last line with no blank line separator.
+
+Bullet writing rules:
+• Use strong ownership verbs (designed, built, architected, led, owned — never "worked on", "contributed to", "part of").
+• Include scale and numbers where they exist in the source material.
+• Each bullet should convey: what was built, the technical approach or architecture used, and the resulting impact.
+• Signal systems thinking — architecture, tradeoffs, scalability — not just task completion.
+• Avoid generic phrasing like "responsible for", "helped build", or "utilized".
+• Prioritize the most technically impressive or high-impact work in each role.
+
+Bullet structure:
+[Action verb] + [system or feature built] + [technical approach / architecture] + [scale or impact].
+
+Example structure (do not copy content):
+• Designed multi-tenant billing API using event-driven architecture and PostgreSQL schemas, supporting millions of transactions annually.
+• Architected company-wide search infrastructure with Algolia, building indexing pipelines and developer SDKs used across multiple product teams.
+
+After generating the CV, review each bullet and strengthen it by:
+• replacing weak verbs with stronger ownership verbs
+• adding scale or impact where possible
+• removing redundant technologies already listed in skills]
 
 Do not include a cover letter or any other text.`
       : mode === 'cover-letter'
@@ -398,7 +420,29 @@ Do not include a CV or any other text.`
 Produce two sections separated exactly as shown:
 
 ## CV
-[Tailored CV in clean markdown. Use ## for section headings, bullet points for experience. Hard limit: 1–2 pages. Max 3 bullets per role. Omit roles older than 10 years unless exceptional. No filler, no objectives section, no "References available on request". Do not use blank lines between bullet points, between roles, or between sections — no extra line breaks anywhere in the CV. Each section heading (##) should immediately follow the previous section's last line with no blank line separator.]
+[Tailored CV in clean markdown. Use ## for section headings, bullet points for experience. Hard limit: 1–2 pages. Max 3 bullets per role. Omit roles older than 10 years unless exceptional. No filler, no objectives section, no "References available on request".
+
+Do not use blank lines between bullet points, between roles, or between sections — no extra line breaks anywhere in the CV. Each section heading (##) should immediately follow the previous section's last line with no blank line separator.
+
+Bullet writing rules:
+• Use strong ownership verbs (designed, built, architected, led, owned — never "worked on", "contributed to", "part of").
+• Include scale and numbers where they exist in the source material.
+• Each bullet should convey: what was built, the technical approach or architecture used, and the resulting impact.
+• Signal systems thinking — architecture, tradeoffs, scalability — not just task completion.
+• Avoid generic phrasing like "responsible for", "helped build", or "utilized".
+• Prioritize the most technically impressive or high-impact work in each role.
+
+Bullet structure:
+[Action verb] + [system or feature built] + [technical approach / architecture] + [scale or impact].
+
+Example structure (do not copy content):
+• Designed multi-tenant billing API using event-driven architecture and PostgreSQL schemas, supporting millions of transactions annually.
+• Architected company-wide search infrastructure with Algolia, building indexing pipelines and developer SDKs used across multiple product teams.
+
+After generating the CV, review each bullet and strengthen it by:
+• replacing weak verbs with stronger ownership verbs
+• adding scale or impact where possible
+• removing redundant technologies already listed in skills]
 
 ## Cover Letter
 [3 paragraphs max. Professional but not stiff. Don't start with "I am writing to apply for". No more than 350 words.]
@@ -466,6 +510,44 @@ ${job.description.slice(0, 5000)}
 ${context || 'No specific instructions — use your judgement to highlight the most relevant experience and skills for this role.'}
 
 ${outputFormat}`
+}
+
+export function buildSignalExtractionPrompt(job: ScrapedJob, profile: MasterProfile): string {
+  const exps = (profile.experiences ?? []).map(e =>
+    `- ${e.title} at ${e.company} (${e.dates}): ${(e.bullets ?? []).slice(0, 2).join(' | ')}`
+  ).join('\n')
+
+  const projects = (profile.projects ?? []).map(p =>
+    `- ${p.name}: ${p.description}`
+  ).join('\n')
+
+  return `You are a senior technical recruiter preparing a CV writer for a specific job application.
+
+Analyze the job description and candidate background, then output a structured signal brief to guide CV generation.
+
+## Job
+Title: ${job.title}
+Company: ${job.company}
+Description:
+${job.description.slice(0, 3000)}
+
+## Candidate
+Summary: ${profile.summary}
+Experience:
+${exps}
+${projects ? `\nProjects:\n${projects}` : ''}
+
+## Task
+Return ONLY valid JSON with this exact shape — no markdown, no explanation:
+{
+  "seniority": "inferred seniority level this role expects",
+  "companyType": "startup | scaleup | enterprise | agency",
+  "coreStack": ["top 5 tech from the JD the candidate has"],
+  "architectureSignals": ["key architecture / system design themes the JD emphasizes"],
+  "emphasize": ["3-5 specific experiences or projects from the candidate to foreground — be specific"],
+  "deprioritize": ["1-3 things to downplay or omit — e.g. junior work, irrelevant tech"],
+  "toneAndStyle": "one sentence describing tone — e.g. pragmatic startup engineer, scaled platform builder"
+}`
 }
 
 export function buildJobParsePrompt(rawText: string, url: string): string {

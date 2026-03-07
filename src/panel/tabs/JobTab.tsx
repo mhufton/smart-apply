@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { ScrapedJob, FitAnalysis, GeneratedDocuments } from '../../types'
-import { callHaiku, callSonnet, buildFitPrompt, buildDocsPrompt, buildJobParsePrompt, parseDocsResponse, type DocMode } from '../lib/claude'
+import { callHaiku, callSmall, callSonnet, buildFitPrompt, buildDocsPrompt, buildSignalExtractionPrompt, buildJobParsePrompt, parseDocsResponse, type DocMode } from '../lib/claude'
 import { getAutoAnalyze } from './SettingsTab'
 import { loadProfile } from '../lib/storage'
 import ErrorBanner from '../components/ErrorBanner'
@@ -23,6 +23,7 @@ export default function JobTab({ job, fit, onJobScraped, onFitAnalyzed, onGenera
   const [scrapingFields, setScrapingFields] = useState(false)
   const [analyzing, setAnalyzing] = useState(false)
   const [generating, setGenerating] = useState(false)
+  const [generatingStatus, setGeneratingStatus] = useState('')
   const [activeAngles, setActiveAngles] = useState<string[]>([])
   const [customContext, setCustomContext] = useState('')
   const [docMode, setDocMode] = useState<DocMode>('both')
@@ -124,12 +125,39 @@ export default function JobTab({ job, fit, onJobScraped, onFitAnalyzed, onGenera
     onGenerateStart()
     try {
       const profile = await loadProfile()
-      const context = [
+
+      // Stage 1: extract signals from JD + profile
+      setGeneratingStatus('Analysing role signals…')
+      let signalsRaw = ''
+      await callSmall([{ role: 'user', content: buildSignalExtractionPrompt(job, profile) }], chunk => { signalsRaw += chunk })
+
+      let signalsContext = ''
+      try {
+        const jsonMatch = signalsRaw.match(/\{[\s\S]*\}/)
+        if (jsonMatch) {
+          const s = JSON.parse(jsonMatch[0])
+          signalsContext = [
+            `Role signals extracted for this application:`,
+            `- Seniority: ${s.seniority}`,
+            `- Company type: ${s.companyType}`,
+            `- Core stack to match: ${(s.coreStack ?? []).join(', ')}`,
+            `- Architecture themes: ${(s.architectureSignals ?? []).join(', ')}`,
+            `- Emphasise: ${(s.emphasize ?? []).join('; ')}`,
+            `- Deprioritise: ${(s.deprioritize ?? []).join('; ')}`,
+            `- Tone: ${s.toneAndStyle}`,
+          ].join('\n')
+        }
+      } catch { /* if parsing fails, proceed without signals */ }
+
+      // Stage 2: generate docs with signals + user context
+      setGeneratingStatus('Generating documents…')
+      const userContext = [
+        signalsContext,
         ...activeAngles.map(a => `- ${a}`),
         customContext ? `Additional context: ${customContext}` : '',
       ].filter(Boolean).join('\n')
 
-      const prompt = buildDocsPrompt(job, profile, context, docMode)
+      const prompt = buildDocsPrompt(job, profile, userContext, docMode)
       let raw = ''
       await callSonnet([{ role: 'user', content: prompt }], (chunk) => {
         raw += chunk
@@ -139,6 +167,7 @@ export default function JobTab({ job, fit, onJobScraped, onFitAnalyzed, onGenera
       setError(e instanceof Error ? e.message : 'Document generation failed.')
     } finally {
       setGenerating(false)
+      setGeneratingStatus('')
       onGenerateDone()
     }
   }
@@ -236,7 +265,7 @@ export default function JobTab({ job, fit, onJobScraped, onFitAnalyzed, onGenera
               className="btn-primary w-full flex items-center justify-center gap-2"
             >
               {generating && <Spinner className="w-3 h-3" />}
-              {generating ? 'Generating...' : `Generate ${docMode === 'cv' ? 'CV' : docMode === 'cover-letter' ? 'Cover Letter' : 'CV + Cover Letter'}`}
+              {generating ? (generatingStatus || 'Generating…') : `Generate ${docMode === 'cv' ? 'CV' : docMode === 'cover-letter' ? 'Cover Letter' : 'CV + Cover Letter'}`}
             </button>
           </Section>
         )}
