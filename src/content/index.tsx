@@ -110,6 +110,26 @@ function scrapeFormFields(): FormField[] {
     }
 
     const required = (input as HTMLInputElement).required
+
+    // Build a selector that survives pages where fields lack id AND name:
+    // tag the element with a data attribute we can find again at inject time.
+    let selector: string
+    if (id) {
+      selector = `#${CSS.escape(id)}`
+    } else if (input.name) {
+      selector = `[name="${input.name.replace(/"/g, '\\"')}"]`
+    } else {
+      input.setAttribute('data-sa-field', String(i))
+      selector = `[data-sa-field="${i}"]`
+    }
+
+    const options = type === 'select'
+      ? Array.from((input as HTMLSelectElement).options)
+          .map(o => o.text.trim())
+          .filter(Boolean)
+          .slice(0, 30)
+      : undefined
+
     fields.push({
       label,
       type,
@@ -117,7 +137,8 @@ function scrapeFormFields(): FormField[] {
       id,
       required,
       isEssayQuestion: classifyEssayQuestion(label, type, required),
-      selector: id ? `#${id}` : `[name="${input.name}"]`,
+      selector,
+      options,
     })
   })
 
@@ -287,20 +308,52 @@ function scrapeLinkedInProfile(): Partial<MasterProfile> {
 
 // ── Field Injection ───────────────────────────────────────────────────────────
 
-function injectFields(values: Record<string, string>) {
-  for (const [selector, value] of Object.entries(values)) {
-    const el = document.querySelector<HTMLInputElement | HTMLTextAreaElement>(selector)
-    if (!el) continue
+function injectFields(values: Record<string, string>): { filled: number; missed: string[] } {
+  let filled = 0
+  const missed: string[] = []
 
-    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-      el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype,
-      'value'
-    )?.set
-
-    nativeInputValueSetter?.call(el, value)
+  const fireEvents = (el: HTMLElement) => {
     el.dispatchEvent(new Event('input', { bubbles: true }))
     el.dispatchEvent(new Event('change', { bubbles: true }))
+    el.dispatchEvent(new Event('blur', { bubbles: true }))
   }
+
+  for (const [selector, value] of Object.entries(values)) {
+    try {
+      const el = document.querySelector<HTMLElement>(selector)
+      if (!el) { missed.push(selector); continue }
+
+      if (el instanceof HTMLSelectElement) {
+        const target = String(value).trim().toLowerCase()
+        const opt = Array.from(el.options).find(o =>
+          o.value.trim().toLowerCase() === target || o.text.trim().toLowerCase() === target
+        ) ?? Array.from(el.options).find(o =>
+          o.text.trim().toLowerCase().includes(target) || target.includes(o.text.trim().toLowerCase())
+        )
+        if (!opt) { missed.push(selector); continue }
+        el.value = opt.value
+        fireEvents(el)
+        filled++
+      } else if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+        const proto = el instanceof HTMLTextAreaElement
+          ? HTMLTextAreaElement.prototype
+          : HTMLInputElement.prototype
+        Object.getOwnPropertyDescriptor(proto, 'value')?.set?.call(el, value)
+        fireEvents(el)
+        filled++
+      } else if (el.isContentEditable) {
+        el.textContent = value
+        fireEvents(el)
+        filled++
+      } else {
+        missed.push(selector)
+      }
+    } catch {
+      missed.push(selector)
+    }
+  }
+
+  return { filled, missed }
 }
 
 // ── Message Listener ──────────────────────────────────────────────────────────
@@ -315,9 +368,12 @@ chrome.runtime.onMessage.addListener((message: ExtMessage, _sender, sendResponse
     sendResponse(profile)
     return false
   }
+  if (message.type === 'SCRAPE_FIELDS') {
+    sendResponse(scrapeFormFields())
+    return false
+  }
   if (message.type === 'INJECT_FIELDS') {
-    injectFields(message.payload)
-    sendResponse({ ok: true })
+    sendResponse(injectFields(message.payload))
     return false
   }
   return false

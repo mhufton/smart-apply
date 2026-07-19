@@ -56,6 +56,12 @@ export interface FormField {
   required: boolean
   isEssayQuestion: boolean
   selector: string
+  options?: string[]   // visible option texts for select fields
+}
+
+export interface InjectResult {
+  filled: number
+  missed: string[]   // selectors that could not be filled
 }
 
 export interface ScrapedJob {
@@ -101,6 +107,7 @@ export interface GeneratedDocuments {
 export type ExtMessage =
   | { type: 'SCRAPE_JOB' }
   | { type: 'SCRAPE_PROFILE' }
+  | { type: 'SCRAPE_FIELDS' }
   | { type: 'INJECT_FIELDS'; payload: Record<string, string> }
 
 // ── Document History ──────────────────────────────────────────────────────────

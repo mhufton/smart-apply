@@ -112,20 +112,95 @@ function linkedInScrapeProfile() {
   }
 }
 
+// Self-contained: runs inside the page context via executeScript.
+// Fresh field scrape for the fill-form flow (options included, tag fallback for selector).
+function linkedInScrapeFields() {
+  const fields: FormField[] = []
+  document.querySelectorAll('input, textarea, select').forEach((el, i) => {
+    const input = el as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    const inputType = (input as HTMLInputElement).type
+    if (inputType === 'hidden' || inputType === 'submit' || inputType === 'button') return
+    let label = ''
+    if (input.id) {
+      label = document.querySelector(`label[for="${input.id}"]`)?.textContent?.trim() ?? ''
+    }
+    if (!label) {
+      const wrapper = input.closest('div, li, fieldset')
+      if (wrapper) {
+        label = wrapper.querySelector('label, legend, [class*="label"], [class*="title"]')?.textContent?.trim() ?? ''
+      }
+    }
+    if (!label) label = input.getAttribute('placeholder') ?? input.getAttribute('aria-label') ?? `Field ${i}`
+    const tag = el.tagName.toLowerCase()
+    let type = 'unknown'
+    if (tag === 'textarea') type = 'textarea'
+    else if (tag === 'select') type = 'select'
+    else {
+      if (['text', 'email', 'tel', 'url'].includes(inputType)) type = 'text'
+      else if (inputType === 'file') type = 'file'
+      else if (inputType === 'checkbox') type = 'checkbox'
+      else if (inputType === 'radio') type = 'radio'
+    }
+    let selector: string
+    if (input.id) selector = `#${CSS.escape(input.id)}`
+    else if (input.name) selector = `[name="${input.name.replace(/"/g, '\\"')}"]`
+    else {
+      input.setAttribute('data-sa-field', String(i))
+      selector = `[data-sa-field="${i}"]`
+    }
+    const options = tag === 'select'
+      ? Array.from((input as HTMLSelectElement).options).map(o => o.text.trim()).filter(Boolean).slice(0, 30)
+      : undefined
+    fields.push({
+      label, type: type as FormField['type'], name: input.name, id: input.id,
+      required: (input as HTMLInputElement).required, isEssayQuestion: false,
+      selector, options,
+    })
+  })
+  return fields
+}
+
 // Self-contained: runs inside the page context via executeScript, receives values as arg
 function linkedInInjectFields(values: Record<string, string>) {
-  for (const [selector, value] of Object.entries(values)) {
-    const el = document.querySelector(selector) as HTMLInputElement | HTMLTextAreaElement | null
-    if (!el) continue
-    const nativeSet = Object.getOwnPropertyDescriptor(
-      el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype,
-      'value'
-    )?.set
-    nativeSet?.call(el, value)
+  let filled = 0
+  const missed: string[] = []
+  const fireEvents = (el: HTMLElement) => {
     el.dispatchEvent(new Event('input', { bubbles: true }))
     el.dispatchEvent(new Event('change', { bubbles: true }))
+    el.dispatchEvent(new Event('blur', { bubbles: true }))
   }
-  return { ok: true }
+  for (const [selector, value] of Object.entries(values)) {
+    try {
+      const el = document.querySelector(selector) as HTMLElement | null
+      if (!el) { missed.push(selector); continue }
+      if (el instanceof HTMLSelectElement) {
+        const target = String(value).trim().toLowerCase()
+        const opt = Array.from(el.options).find(o =>
+          o.value.trim().toLowerCase() === target || o.text.trim().toLowerCase() === target
+        ) ?? Array.from(el.options).find(o =>
+          o.text.trim().toLowerCase().includes(target) || target.includes(o.text.trim().toLowerCase())
+        )
+        if (!opt) { missed.push(selector); continue }
+        el.value = opt.value
+        fireEvents(el)
+        filled++
+      } else if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+        const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype
+        Object.getOwnPropertyDescriptor(proto, 'value')?.set?.call(el, value)
+        fireEvents(el)
+        filled++
+      } else if (el.isContentEditable) {
+        el.textContent = value
+        fireEvents(el)
+        filled++
+      } else {
+        missed.push(selector)
+      }
+    } catch {
+      missed.push(selector)
+    }
+  }
+  return { filled, missed }
 }
 
 async function handleLinkedIn(
@@ -139,6 +214,8 @@ async function handleLinkedIn(
       results = await chrome.scripting.executeScript({ target: { tabId }, func: linkedInScrapeJob })
     } else if (message.type === 'SCRAPE_PROFILE') {
       results = await chrome.scripting.executeScript({ target: { tabId }, func: linkedInScrapeProfile })
+    } else if (message.type === 'SCRAPE_FIELDS') {
+      results = await chrome.scripting.executeScript({ target: { tabId }, func: linkedInScrapeFields })
     } else if (message.type === 'INJECT_FIELDS') {
       results = await chrome.scripting.executeScript({ target: { tabId }, func: linkedInInjectFields, args: [message.payload] })
     }
@@ -175,7 +252,7 @@ function relayToContentScript(
 // ── Message router ────────────────────────────────────────────────────────────
 
 chrome.runtime.onMessage.addListener((message: ExtMessage, _sender, sendResponse) => {
-  if (message.type === 'SCRAPE_JOB' || message.type === 'SCRAPE_PROFILE' || message.type === 'INJECT_FIELDS') {
+  if (message.type === 'SCRAPE_JOB' || message.type === 'SCRAPE_PROFILE' || message.type === 'SCRAPE_FIELDS' || message.type === 'INJECT_FIELDS') {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       const tab = tabs[0]
       if (!tab?.id) {

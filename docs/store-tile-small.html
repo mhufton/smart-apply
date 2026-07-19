@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Smart Apply — Small Promo Tile</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #e0e7ff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    .tile {
+      width: 440px;
+      height: 280px;
+      background: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 32px 36px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .tile::before {
+      content: '';
+      position: absolute;
+      top: -100px;
+      left: -100px;
+      width: 400px;
+      height: 400px;
+      background: radial-gradient(circle, rgba(99,102,241,0.08) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    /* Left copy */
+    .copy {
+      flex: 0 0 220px;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      height: 216px;
+    }
+
+    .eyebrow {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: #6366f1;
+    }
+
+    .headline {
+      font-size: 26px;
+      font-weight: 800;
+      line-height: 1.1;
+      color: #0f1117;
+      letter-spacing: -0.02em;
+    }
+
+    .headline .green { color: #22c55e; }
+    .headline .indigo { color: #6366f1; }
+
+    .free-badges {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .free-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 10px;
+      font-weight: 600;
+      color: #475569;
+    }
+
+    .check { color: #22c55e; }
+
+    /* Right mockup */
+    .mockup {
+      flex: 0 0 148px;
+      height: 216px;
+      background: #16181f;
+      border-radius: 10px;
+      overflow: hidden;
+      z-index: 1;
+      box-shadow: 0 16px 40px rgba(0,0,0,0.15);
+    }
+
+    .mockup-bar {
+      background: #1e2028;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      padding: 7px 10px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #6366f1;
+    }
+
+    .mockup-title {
+      font-size: 9px;
+      font-weight: 600;
+      color: #e2e8f0;
+    }
+
+    .mockup-body {
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .score-card {
+      background: rgba(34,197,94,0.1);
+      border: 1px solid rgba(34,197,94,0.2);
+      border-radius: 7px;
+      padding: 8px 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .score-num {
+      font-size: 22px;
+      font-weight: 800;
+      color: #22c55e;
+      line-height: 1;
+    }
+
+    .score-label {
+      font-size: 9px;
+      font-weight: 600;
+      color: #86efac;
+    }
+
+    .score-sub {
+      font-size: 8px;
+      color: #4ade80;
+      opacity: 0.7;
+      margin-top: 1px;
+    }
+
+    .gen-btn {
+      background: #6366f1;
+      color: white;
+      font-size: 9px;
+      font-weight: 600;
+      padding: 7px 10px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .gen-btn-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: #a5b4fc;
+      flex-shrink: 0;
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    .cv-preview {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 6px;
+      padding: 8px;
+    }
+
+    .cv-line {
+      height: 5px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 3px;
+      margin-bottom: 5px;
+    }
+    .cv-line:last-child { margin-bottom: 0; }
+    .cv-line.short { width: 55%; }
+    .cv-line.medium { width: 78%; }
+    .cv-line.long { width: 95%; }
+    .cv-line.accent { background: rgba(99,102,241,0.35); width: 40%; }
+  </style>
+</head>
+<body>
+  <div class="tile">
+    <div class="copy">
+      <div class="eyebrow">Smart Apply</div>
+      <div class="headline">
+        Apply at<br>
+        <span class="green">AI speed,</span><br>
+        with <span class="indigo">human<br>judgement.</span>
+      </div>
+      <div class="free-badges">
+        <span class="free-badge"><span class="check">✓</span> Free · No subscription</span>
+        <span class="free-badge"><span class="check">✓</span> Your API key, your data</span>
+      </div>
+    </div>
+
+    <div class="mockup">
+      <div class="mockup-bar">
+        <div class="dot"></div>
+        <div class="mockup-title">Smart Apply</div>
+      </div>
+      <div class="mockup-body">
+        <div class="score-card">
+          <div class="score-num">87</div>
+          <div>
+            <div class="score-label">Strong fit</div>
+            <div class="score-sub">3 signals matched</div>
+          </div>
+        </div>
+        <div class="gen-btn">
+          <div class="gen-btn-dot"></div>
+          Generating CV…
+        </div>
+        <div class="cv-preview">
+          <div class="cv-line accent"></div>
+          <div class="cv-line long"></div>
+          <div class="cv-line medium"></div>
+          <div class="cv-line short"></div>
+          <div class="cv-line long"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

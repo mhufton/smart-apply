@@ -4,7 +4,8 @@ import Spinner from '../components/Spinner'
 import DOMPurify from 'dompurify'
 import { renderMarkdown } from '../lib/markdown'
 import { loadDocHistory, deleteDocHistoryEntry, appendDocHistory, loadProfile } from '../lib/storage'
-import { callSmall, buildFormFillPrompt } from '../lib/claude'
+import { callParse, buildFormFillPrompt } from '../lib/claude'
+import { fillFormOnPage } from '../lib/formFill'
 
 interface Props {
   docs: GeneratedDocuments | null
@@ -25,6 +26,7 @@ export default function DocumentsTab({ docs, job, generating, onDocsChange, onOp
   const [view, setView] = useState<DocView>('cv')
   const [editing, setEditing] = useState(false)
   const [injecting, setInjecting] = useState(false)
+  const [fillResult, setFillResult] = useState<string | null>(null)
   const [history, setHistory] = useState<DocHistoryEntry[]>([])
   const [historyPreview, setHistoryPreview] = useState<{ entry: DocHistoryEntry; field: 'cv' | 'coverLetter' } | null>(null)
   const [saving, setSaving] = useState(false)
@@ -97,23 +99,17 @@ export default function DocumentsTab({ docs, job, generating, onDocsChange, onOp
   }
 
   async function handleInjectIntoForm() {
-    if (!job || !docs) return
     setInjecting(true)
+    setFillResult(null)
     try {
-      const profile = await loadProfile()
-      const prompt = buildFormFillPrompt(job.formFields, profile, docs.coverLetter)
-      if (!prompt) return
-
-      let raw = ''
-      await callSmall([{ role: 'user', content: prompt }], chunk => { raw += chunk })
-
-      const jsonMatch = raw.match(/\{[\s\S]*\}/)
-      if (!jsonMatch) throw new Error('No JSON in response')
-      const fieldMap: Record<string, string> = JSON.parse(jsonMatch[0])
-
-      await chrome.runtime.sendMessage({ type: 'INJECT_FIELDS', payload: fieldMap })
+      const outcome = await fillFormOnPage({
+        coverLetter: docs?.coverLetter ?? '',
+        fallbackFields: job?.formFields,
+      })
+      setFillResult(outcome.message)
     } catch (e) {
       console.error('[Smart Apply] Form fill failed:', e)
+      setFillResult('Form fill failed — see console')
     } finally {
       setInjecting(false)
     }
@@ -128,7 +124,7 @@ export default function DocumentsTab({ docs, job, generating, onDocsChange, onOp
       if (!prompt) return
 
       let raw = ''
-      await callSmall([{ role: 'user', content: prompt }], chunk => { raw += chunk })
+      await callParse([{ role: 'user', content: prompt }], chunk => { raw += chunk })
 
       const jsonMatch = raw.match(/\{[\s\S]*\}/)
       if (!jsonMatch) throw new Error('No JSON in response')
@@ -423,6 +419,14 @@ export default function DocumentsTab({ docs, job, generating, onDocsChange, onOp
           <CopyButton text={activeDoc} />
         )}
       </div>}
+
+      {/* Fill-form result */}
+      {fillResult && view !== 'history' && view !== 'questions' && (
+        <div className="shrink-0 px-4 py-1.5 text-[11px] text-center bg-indigo-500/10 text-indigo-500 dark:text-indigo-300 border-t border-slate-200 dark:border-white/5 flex items-center justify-center gap-2">
+          <span>{fillResult}</span>
+          <button onClick={() => setFillResult(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">✕</button>
+        </div>
+      )}
 
       {/* Footer actions — hidden in history + questions views */}
       {view !== 'history' && view !== 'questions' && !historyPreview && (

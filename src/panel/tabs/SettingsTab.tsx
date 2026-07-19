@@ -8,18 +8,20 @@ type Preset = {
   endpoint: string
   keyPrefix: string
   keyPlaceholder: string
-  smallModel: string
-  largeModel: string
+  parseModel: string
+  fitModel: string
+  writeModel: string
   docsUrl: string
 }
 
 const PRESETS: Preset[] = [
-  { label: 'Anthropic',   provider: 'anthropic',        endpoint: 'https://api.anthropic.com',                        keyPrefix: 'sk-ant-', keyPlaceholder: 'sk-ant-api03-...', smallModel: 'claude-haiku-4-5-20251001', largeModel: 'claude-sonnet-4-5',           docsUrl: 'https://console.anthropic.com/settings/keys' },
-  { label: 'OpenAI',      provider: 'openai-compatible', endpoint: 'https://api.openai.com/v1',                       keyPrefix: 'sk-',     keyPlaceholder: 'sk-...',           smallModel: 'gpt-4o-mini',               largeModel: 'gpt-4o',                      docsUrl: 'https://platform.openai.com/api-keys' },
-  { label: 'Gemini',      provider: 'openai-compatible', endpoint: 'https://generativelanguage.googleapis.com/v1beta/openai', keyPrefix: 'AI', keyPlaceholder: 'AIza...',        smallModel: 'gemini-2.0-flash',          largeModel: 'gemini-2.5-pro-preview-03-25', docsUrl: 'https://aistudio.google.com/apikey' },
-  { label: 'Groq',        provider: 'openai-compatible', endpoint: 'https://api.groq.com/openai/v1',                  keyPrefix: 'gsk_',    keyPlaceholder: 'gsk_...',          smallModel: 'llama-3.1-8b-instant',      largeModel: 'llama-3.3-70b-versatile',     docsUrl: 'https://console.groq.com/keys' },
-  { label: 'OpenRouter',  provider: 'openai-compatible', endpoint: 'https://openrouter.ai/api/v1',                    keyPrefix: 'sk-or-',  keyPlaceholder: 'sk-or-...',        smallModel: 'anthropic/claude-haiku-3-5', largeModel: 'anthropic/claude-sonnet-4-5', docsUrl: 'https://openrouter.ai/keys' },
-  { label: 'Custom',      provider: 'openai-compatible', endpoint: '',                                                 keyPrefix: '',        keyPlaceholder: 'API key',          smallModel: '',                          largeModel: '',                            docsUrl: '' },
+  { label: 'Claude CLI',  provider: 'openai-compatible', endpoint: 'http://localhost:4141/v1',                        keyPrefix: '',        keyPlaceholder: 'not needed — leave blank', parseModel: 'claude-haiku-4-5',          fitModel: 'claude-sonnet-4-6',           writeModel: 'claude-opus-4-8',             docsUrl: '' },
+  { label: 'Anthropic',   provider: 'anthropic',        endpoint: 'https://api.anthropic.com',                        keyPrefix: 'sk-ant-', keyPlaceholder: 'sk-ant-api03-...', parseModel: 'claude-haiku-4-5-20251001', fitModel: 'claude-sonnet-4-5',           writeModel: 'claude-opus-4-8',             docsUrl: 'https://console.anthropic.com/settings/keys' },
+  { label: 'OpenAI',      provider: 'openai-compatible', endpoint: 'https://api.openai.com/v1',                       keyPrefix: 'sk-',     keyPlaceholder: 'sk-...',           parseModel: 'gpt-4o-mini',               fitModel: 'gpt-4o-mini',                 writeModel: 'gpt-4o',                      docsUrl: 'https://platform.openai.com/api-keys' },
+  { label: 'Gemini',      provider: 'openai-compatible', endpoint: 'https://generativelanguage.googleapis.com/v1beta/openai', keyPrefix: 'AI', keyPlaceholder: 'AIza...',        parseModel: 'gemini-2.0-flash',          fitModel: 'gemini-2.0-flash',            writeModel: 'gemini-2.5-pro-preview-03-25', docsUrl: 'https://aistudio.google.com/apikey' },
+  { label: 'Groq',        provider: 'openai-compatible', endpoint: 'https://api.groq.com/openai/v1',                  keyPrefix: 'gsk_',    keyPlaceholder: 'gsk_...',          parseModel: 'llama-3.1-8b-instant',      fitModel: 'llama-3.3-70b-versatile',     writeModel: 'llama-3.3-70b-versatile',     docsUrl: 'https://console.groq.com/keys' },
+  { label: 'OpenRouter',  provider: 'openai-compatible', endpoint: 'https://openrouter.ai/api/v1',                    keyPrefix: 'sk-or-',  keyPlaceholder: 'sk-or-...',        parseModel: 'anthropic/claude-haiku-3-5', fitModel: 'anthropic/claude-sonnet-4-5', writeModel: 'anthropic/claude-sonnet-4-5', docsUrl: 'https://openrouter.ai/keys' },
+  { label: 'Custom',      provider: 'openai-compatible', endpoint: '',                                                 keyPrefix: '',        keyPlaceholder: 'API key',          parseModel: '',                          fitModel: '',                            writeModel: '',                            docsUrl: '' },
 ]
 
 export const AUTO_ANALYZE_KEY = 'autoAnalyzeFit'
@@ -34,8 +36,9 @@ export default function SettingsTab() {
   const [preset, setPreset] = useState(0)
   const [keyInput, setKeyInput] = useState('')
   const [endpoint, setEndpoint] = useState(PRESETS[0].endpoint)
-  const [smallModel, setSmallModel] = useState(PRESETS[0].smallModel)
-  const [largeModel, setLargeModel] = useState(PRESETS[0].largeModel)
+  const [parseModel, setParseModel] = useState(PRESETS[0].parseModel)
+  const [fitModel, setFitModel] = useState(PRESETS[0].fitModel)
+  const [writeModel, setWriteModel] = useState(PRESETS[0].writeModel)
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [error, setError] = useState('')
   const [autoAnalyze, setAutoAnalyze] = useState(false)
@@ -48,25 +51,28 @@ export default function SettingsTab() {
       const idx = PRESETS.findIndex(p => p.provider === cfg.provider && (p.provider === 'anthropic' || p.endpoint === cfg.endpoint))
       setPreset(idx >= 0 ? idx : PRESETS.length - 1)
       setEndpoint(cfg.endpoint)
-      setSmallModel(cfg.smallModel)
-      setLargeModel(cfg.largeModel)
+      setParseModel(cfg.parseModel)
+      setFitModel(cfg.fitModel)
+      setWriteModel(cfg.writeModel)
     })
   }, [])
 
   function handlePresetChange(idx: number) {
     setPreset(idx)
     setEndpoint(PRESETS[idx].endpoint)
-    setSmallModel(PRESETS[idx].smallModel)
-    setLargeModel(PRESETS[idx].largeModel)
+    setParseModel(PRESETS[idx].parseModel)
+    setFitModel(PRESETS[idx].fitModel)
+    setWriteModel(PRESETS[idx].writeModel)
     setError('')
   }
 
   async function handleSave() {
     const key = keyInput.trim()
-    if (!key) { setError('Enter your API key.'); return }
     if (!endpoint.trim()) { setError('Enter the endpoint URL.'); return }
     const trimmedEndpoint = endpoint.trim()
     const isLocal = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/.test(trimmedEndpoint)
+    // Local endpoints (e.g. the Claude CLI bridge) need no API key.
+    if (!key && !isLocal) { setError('Enter your API key.'); return }
     if (!isLocal && !trimmedEndpoint.startsWith('https://')) {
       setError('Endpoint must use HTTPS to protect your API key.')
       return
@@ -77,10 +83,11 @@ export default function SettingsTab() {
     try {
       await saveProviderConfig({
         provider: PRESETS[preset].provider,
-        apiKey: key,
+        apiKey: key || 'local',
         endpoint: endpoint.trim(),
-        smallModel: smallModel.trim() || PRESETS[preset].smallModel,
-        largeModel: largeModel.trim() || PRESETS[preset].largeModel,
+        parseModel: parseModel.trim() || PRESETS[preset].parseModel,
+        fitModel: fitModel.trim() || PRESETS[preset].fitModel,
+        writeModel: writeModel.trim() || PRESETS[preset].writeModel,
       })
       setConfig(await getProviderConfig())
       setKeyInput('')
@@ -118,7 +125,7 @@ export default function SettingsTab() {
               </div>
               <div className="text-xs font-mono text-emerald-400">{maskKey(config.apiKey)}</div>
               {config.provider === 'openai-compatible' && (
-                <div className="text-[10px] text-slate-400 truncate">{config.smallModel} · {config.largeModel}</div>
+                <div className="text-[10px] text-slate-400 truncate">{config.parseModel} · {config.fitModel} · {config.writeModel}</div>
               )}
             </div>
             <button onClick={handleClear} className="btn-secondary w-full text-xs text-red-400 border-red-500/20 hover:border-red-500/40">
@@ -157,23 +164,34 @@ export default function SettingsTab() {
               />
             </div>
             <div>
-              <label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider">Small model <span className="normal-case text-slate-500">(parsing, fit, chat)</span></label>
+              <label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider">Parse model <span className="normal-case text-slate-500">(scrape &amp; parse)</span></label>
               <input
                 type="text"
-                value={smallModel}
-                onChange={e => setSmallModel(e.target.value)}
-                placeholder={PRESETS[preset].smallModel || 'e.g. gpt-4o-mini'}
+                value={parseModel}
+                onChange={e => setParseModel(e.target.value)}
+                placeholder={PRESETS[preset].parseModel || 'e.g. claude-haiku-4-5'}
                 className="input-base w-full font-mono text-[11px]"
                 spellCheck={false}
               />
             </div>
             <div>
-              <label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider">Large model <span className="normal-case text-slate-500">(CV + cover letter)</span></label>
+              <label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider">Fit model <span className="normal-case text-slate-500">(judge fit)</span></label>
               <input
                 type="text"
-                value={largeModel}
-                onChange={e => setLargeModel(e.target.value)}
-                placeholder={PRESETS[preset].largeModel || 'e.g. gpt-4o'}
+                value={fitModel}
+                onChange={e => setFitModel(e.target.value)}
+                placeholder={PRESETS[preset].fitModel || 'e.g. claude-sonnet-4-6'}
+                className="input-base w-full font-mono text-[11px]"
+                spellCheck={false}
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider">Write model <span className="normal-case text-slate-500">(CV + cover letter)</span></label>
+              <input
+                type="text"
+                value={writeModel}
+                onChange={e => setWriteModel(e.target.value)}
+                placeholder={PRESETS[preset].writeModel || 'e.g. claude-opus-4-8'}
                 className="input-base w-full font-mono text-[11px]"
                 spellCheck={false}
               />
@@ -204,7 +222,7 @@ export default function SettingsTab() {
             {error && <p className="text-xs text-red-400">{error}</p>}
             <button
               onClick={handleSave}
-              disabled={!keyInput.trim() || status === 'saving'}
+              disabled={(!keyInput.trim() && !/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/.test(endpoint.trim())) || status === 'saving'}
               className="btn-primary w-full"
             >
               {status === 'saving' ? 'Saving...' : status === 'saved' ? 'Saved!' : 'Save'}
@@ -217,13 +235,15 @@ export default function SettingsTab() {
         <div className="space-y-2 text-xs">
           {config?.provider === 'openai-compatible' ? (
             <>
-              <ModelRow label="Fit analysis, parsing, chat" model={config.smallModel || '—'} note="Small" />
-              <ModelRow label="CV + cover letter"           model={config.largeModel  || '—'} note="Large" />
+              <ModelRow label="Scrape & parse"    model={config.parseModel || '—'} note="Parse" />
+              <ModelRow label="Judge fit"         model={config.fitModel   || '—'} note="Fit" />
+              <ModelRow label="CV + cover letter" model={config.writeModel || '—'} note="Write" />
             </>
           ) : (
             <>
-              <ModelRow label="Fit analysis, parsing, chat" model="claude-haiku-4-5"  note="Small" />
-              <ModelRow label="CV + cover letter"           model="claude-sonnet-4-5" note="Large" />
+              <ModelRow label="Scrape & parse"    model="claude-haiku-4-5"  note="Parse" />
+              <ModelRow label="Judge fit"         model="claude-sonnet-4-6" note="Fit" />
+              <ModelRow label="CV + cover letter" model="claude-opus-4-8"   note="Write" />
             </>
           )}
         </div>

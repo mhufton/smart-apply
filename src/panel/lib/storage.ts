@@ -41,6 +41,26 @@ export async function saveProfile(profile: MasterProfile): Promise<void> {
   await db.profile.put({ id: 1, data: profile })
 }
 
+// ── Long-term CV / cover letter preferences ───────────────────────────────────
+// Standing instructions applied to every document generation (e.g. "always keep
+// CV to one page", "British spelling", "never mention hospitality roles").
+
+export interface DocPreferences {
+  cv: string
+  coverLetter: string
+}
+
+const DOC_PREFS_KEY = 'sa_doc_preferences'
+
+export async function loadDocPrefs(): Promise<DocPreferences> {
+  const result = await chrome.storage.local.get(DOC_PREFS_KEY)
+  return { cv: '', coverLetter: '', ...(result[DOC_PREFS_KEY] ?? {}) }
+}
+
+export async function saveDocPrefs(prefs: DocPreferences): Promise<void> {
+  await chrome.storage.local.set({ [DOC_PREFS_KEY]: prefs })
+}
+
 // ── Document history ──────────────────────────────────────────────────────────
 
 const MAX_HISTORY = 50

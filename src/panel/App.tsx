@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import type { ScrapedJob, FitAnalysis, GeneratedDocuments, ChatMessage } from '../types'
-import { callSonnet, buildDocsPrompt, parseDocsResponse } from './lib/claude'
-import { loadProfile, getCachedJob, upsertCachedJob } from './lib/storage'
+import { callWrite, buildDocsPrompt, parseDocsResponse } from './lib/claude'
+import { loadProfile, loadDocPrefs, getCachedJob, upsertCachedJob } from './lib/storage'
 import { upsertApplication } from './lib/db'
 import JobTab from './tabs/JobTab'
 import ProfileTab from './tabs/ProfileTab'
@@ -80,9 +80,9 @@ export default function App() {
     setGenerating(true)
     try {
       const profile = await loadProfile()
-      const prompt = buildDocsPrompt(job, profile, '', mode)
+      const prompt = buildDocsPrompt(job, profile, '', mode, await loadDocPrefs())
       let raw = ''
-      await callSonnet([{ role: 'user', content: prompt }], (chunk) => {
+      await callWrite([{ role: 'user', content: prompt }], (chunk) => {
         raw += chunk
         const partial = parseDocsResponse(raw, mode)
         setDocs(prev => {

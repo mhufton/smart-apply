@@ -8,8 +8,9 @@ export interface ProviderConfig {
   provider: Provider
   apiKey: string
   endpoint: string    // base URL — only used for openai-compatible
-  smallModel: string  // fast/cheap model (parsing, fit analysis, chat)
-  largeModel: string  // quality model (CV + cover letter generation)
+  parseModel: string  // cheap/fast — scraping, JD + résumé parsing, form-fill (e.g. Haiku)
+  fitModel: string    // mid — fit analysis + role-signal extraction (e.g. Sonnet)
+  writeModel: string  // top — CV + cover letter writing, chat refinement (e.g. Opus)
 }
 
 const CONFIG_KEY = 'providerConfig'
@@ -17,12 +18,26 @@ const LEGACY_KEY = 'anthropicApiKey'
 
 export async function getProviderConfig(): Promise<ProviderConfig | null> {
   const result = await chrome.storage.local.get([CONFIG_KEY, LEGACY_KEY])
-  if (result[CONFIG_KEY]) return result[CONFIG_KEY] as ProviderConfig
+  if (result[CONFIG_KEY]) return normalizeConfig(result[CONFIG_KEY])
   // Backward compat: migrate old anthropicApiKey
   if (result[LEGACY_KEY]) {
-    return { provider: 'anthropic', apiKey: result[LEGACY_KEY], endpoint: '', smallModel: '', largeModel: '' }
+    return { provider: 'anthropic', apiKey: result[LEGACY_KEY], endpoint: '', parseModel: '', fitModel: '', writeModel: '' }
   }
   return null
+}
+
+// Normalise older two-tier configs ({ smallModel, largeModel }) into the
+// three-tier shape so existing saved settings keep working after upgrade.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function normalizeConfig(c: any): ProviderConfig {
+  return {
+    provider: c.provider,
+    apiKey: c.apiKey,
+    endpoint: c.endpoint ?? '',
+    parseModel: c.parseModel ?? c.smallModel ?? '',
+    fitModel:   c.fitModel   ?? c.smallModel ?? '',
+    writeModel: c.writeModel ?? c.largeModel ?? '',
+  }
 }
 
 export async function saveProviderConfig(config: ProviderConfig): Promise<void> {
@@ -39,7 +54,7 @@ export async function getApiKey(): Promise<string | null> {
   return config?.apiKey ?? null
 }
 export async function saveApiKey(key: string): Promise<void> {
-  await saveProviderConfig({ provider: 'anthropic', apiKey: key, endpoint: '', smallModel: '', largeModel: '' })
+  await saveProviderConfig({ provider: 'anthropic', apiKey: key, endpoint: '', parseModel: '', fitModel: '', writeModel: '' })
 }
 export async function clearApiKey(): Promise<void> {
   await clearProviderConfig()
@@ -133,11 +148,25 @@ async function readSSE(response: Response, onEvent: (json: any) => void): Promis
   }
 }
 
-const ANTHROPIC_SMALL_DEFAULT = 'claude-haiku-4-5-20251001'
-const ANTHROPIC_LARGE_DEFAULT = 'claude-sonnet-4-5'
+type Tier = 'parse' | 'fit' | 'write'
+
+// Fallbacks used only for the direct-Anthropic provider when a tier's model is blank.
+const ANTHROPIC_DEFAULTS: Record<Tier, string> = {
+  parse: 'claude-haiku-4-5-20251001',
+  fit:   'claude-sonnet-4-5',
+  write: 'claude-opus-4-8',
+}
+
+// Pick the configured model for a tier, falling back to adjacent tiers so a
+// half-configured provider still works rather than throwing.
+function modelForTier(config: ProviderConfig, tier: Tier): string {
+  if (tier === 'parse') return config.parseModel || config.fitModel || config.writeModel
+  if (tier === 'fit')   return config.fitModel   || config.writeModel || config.parseModel
+  return config.writeModel || config.fitModel || config.parseModel
+}
 
 async function stream(
-  tier: 'small' | 'large',
+  tier: Tier,
   messages: ApiMessage[],
   onChunk: (text: string) => void,
   maxTokens: number
@@ -145,9 +174,7 @@ async function stream(
   const config = await getProviderConfig()
   if (!config) throw new Error('No API key set. Add one in the Settings tab.')
 
-  const model = tier === 'small'
-    ? (config.smallModel || config.largeModel)
-    : (config.largeModel || config.smallModel)
+  const model = modelForTier(config, tier)
 
   if (config.provider === 'openai-compatible') {
     if (!config.endpoint) throw new Error('No endpoint set. Configure it in the Settings tab.')
@@ -155,32 +182,34 @@ async function stream(
     return streamOpenAICompat(model, messages, config.apiKey, config.endpoint, onChunk, maxTokens)
   }
 
-  const anthropicModel = model || (tier === 'small' ? ANTHROPIC_SMALL_DEFAULT : ANTHROPIC_LARGE_DEFAULT)
-  return streamAnthropic(anthropicModel, messages, config.apiKey, onChunk, maxTokens)
+  return streamAnthropic(model || ANTHROPIC_DEFAULTS[tier], messages, config.apiKey, onChunk, maxTokens)
 }
 
 // ── Model callers ─────────────────────────────────────────────────────────────
 
-// Small — fast, cheap. Used for fit analysis, resume parsing, scraping, chat.
-export async function callSmall(
+// Parse — cheap/fast. Scraping, JD + résumé/LinkedIn parsing, project extract, form-fill.
+export async function callParse(
   messages: ApiMessage[],
   onChunk: (text: string) => void
 ): Promise<void> {
-  return stream('small', messages, onChunk, 4096)
+  return stream('parse', messages, onChunk, 4096)
 }
 
-// Large — higher quality. Used for CV + cover letter generation.
-export async function callLarge(
+// Fit — judgement. Fit analysis + role-signal extraction.
+export async function callFit(
   messages: ApiMessage[],
   onChunk: (text: string) => void
 ): Promise<void> {
-  return stream('large', messages, onChunk, 8192)
+  return stream('fit', messages, onChunk, 4096)
 }
 
-// Legacy aliases
-export const callHaiku = callSmall
-export const callSonnet = callLarge
-export const callClaude = callSmall
+// Write — top quality. CV + cover letter generation and chat refinement.
+export async function callWrite(
+  messages: ApiMessage[],
+  onChunk: (text: string) => void
+): Promise<void> {
+  return stream('write', messages, onChunk, 8192)
+}
 
 // ── Prompts ───────────────────────────────────────────────────────────────────
 
@@ -375,7 +404,8 @@ export function buildDocsPrompt(
   job: ScrapedJob,
   profile: MasterProfile,
   context: string,
-  mode: DocMode = 'both'
+  mode: DocMode = 'both',
+  prefs?: { cv: string; coverLetter: string }
 ): string {
   const outputFormat =
     mode === 'cv'
@@ -449,7 +479,29 @@ After generating the CV, review each bullet and strengthen it by:
 
 Do not include any other text outside these two sections.`
 
-  // Serialize profile cleanly — strip internal IDs/tags, group roles by company
+  const profileBlock = serializeProfile(profile)
+
+  return `You are a professional CV writer producing tailored job application documents.
+
+Important: where multiple roles appear at the same company, treat them as internal progression — not job-hopping. Reflect the full company tenure and growth trajectory in the CV.
+
+## Candidate Profile
+${profileBlock}
+
+## Target Role
+Title: ${job.title}
+Company: ${job.company}
+Description:
+${job.description.slice(0, 5000)}
+
+${buildPrefsBlock(prefs, mode)}## Tailoring Instructions
+${context || 'No specific instructions — use your judgement to highlight the most relevant experience and skills for this role.'}
+
+${outputFormat}`
+}
+
+// Serialize profile cleanly — strip internal IDs/tags, group roles by company
+export function serializeProfile(profile: MasterProfile): string {
   const byCompany = new Map<string, typeof profile.experiences>()
   for (const e of profile.experiences ?? []) {
     const key = e.company.trim()
@@ -471,7 +523,7 @@ Do not include any other text outside these two sections.`
     .map(f => `${f.label}: ${f.value}`)
     .join('\n')
 
-  const profileBlock = `Name: ${profile.basics.name}
+  return `Name: ${profile.basics.name}
 Location: ${profile.basics.location || 'not specified'}
 LinkedIn: ${profile.basics.linkedin || 'not specified'}
 ${customBasics ? customBasics + '\n' : ''}Summary: ${profile.summary || 'not provided'}
@@ -492,24 +544,19 @@ ${(profile.education ?? []).length > 0 ? `Education:\n${(profile.education ?? []
 ${(profile.contextNotes ?? []).length > 0 ? `Additional context:\n${(profile.contextNotes ?? []).map(n =>
   `  ${n.label ? n.label + ': ' : ''}${n.content}`
 ).join('\n')}` : ''}`
+}
 
-  return `You are a professional CV writer producing tailored job application documents.
+// Standing user preferences — always applied, take priority over per-job context
+function buildPrefsBlock(prefs: { cv: string; coverLetter: string } | undefined, mode: DocMode): string {
+  if (!prefs) return ''
+  const parts: string[] = []
+  if (prefs.cv.trim() && mode !== 'cover-letter') parts.push(`### CV preferences\n${prefs.cv.trim()}`)
+  if (prefs.coverLetter.trim() && mode !== 'cv') parts.push(`### Cover letter preferences\n${prefs.coverLetter.trim()}`)
+  if (!parts.length) return ''
+  return `## Standing Preferences (user's long-term rules — ALWAYS follow these, they override other instructions)
+${parts.join('\n\n')}
 
-Important: where multiple roles appear at the same company, treat them as internal progression — not job-hopping. Reflect the full company tenure and growth trajectory in the CV.
-
-## Candidate Profile
-${profileBlock}
-
-## Target Role
-Title: ${job.title}
-Company: ${job.company}
-Description:
-${job.description.slice(0, 5000)}
-
-## Tailoring Instructions
-${context || 'No specific instructions — use your judgement to highlight the most relevant experience and skills for this role.'}
-
-${outputFormat}`
+`
 }
 
 export function buildSignalExtractionPrompt(job: ScrapedJob, profile: MasterProfile): string {
@@ -594,7 +641,7 @@ export function buildFormFillPrompt(
   if (!fillable.length) return ''
 
   const fieldList = fillable.map(f =>
-    `- selector: "${f.selector}" | label: "${f.label}" | type: ${f.type}${f.required ? ' | required' : ''}${f.isEssayQuestion ? ' | essay' : ''}`
+    `- selector: "${f.selector}" | label: "${f.label}" | type: ${f.type}${f.required ? ' | required' : ''}${f.isEssayQuestion ? ' | essay' : ''}${f.options?.length ? ` | options: [${f.options.join(' / ')}]` : ''}`
   ).join('\n')
 
   const basics = profile.basics
@@ -625,7 +672,7 @@ ${fieldList}
 ## Instructions
 Return ONLY a valid JSON object mapping each selector to the value to fill in.
 Only include fields you can confidently fill — omit fields where you have no relevant data.
-For select fields, return the most appropriate option value as a plain string.
+For select fields, return one option copied VERBATIM from that field's options list — never invent a value.
 For fields marked as essay, write a thoughtful answer in full sentences using the cover letter and candidate data as context. For cover letter fields, use the full cover letter text verbatim.
 Do not include file upload fields.
 

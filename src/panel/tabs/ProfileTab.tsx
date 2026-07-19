@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import type { MasterProfile, Experience, Education, Project, ContextNote } from '../../types'
 import { loadProfile, saveProfile } from '../lib/storage'
-import { callHaiku, buildResumeParsePrompt, buildLinkedInParsePrompt, buildProjectExtractPrompt } from '../lib/claude'
+import { callParse, buildResumeParsePrompt, buildLinkedInParsePrompt, buildProjectExtractPrompt } from '../lib/claude'
+import { fillFormOnPage } from '../lib/formFill'
 import Spinner from '../components/Spinner'
 
 export default function ProfileTab() {
@@ -16,6 +17,8 @@ export default function ProfileTab() {
   const [extracting, setExtracting] = useState(false)
   const [error, setError] = useState('')
   const [showImport, setShowImport] = useState(true)
+  const [filling, setFilling] = useState(false)
+  const [fillMsg, setFillMsg] = useState('')
 
   useEffect(() => {
     loadProfile().then(p => {
@@ -71,7 +74,7 @@ export default function ProfileTab() {
       // Background now returns raw text — parse it with Haiku
       const prompt = buildLinkedInParsePrompt(result)
       let raw = ''
-      await callHaiku([{ role: 'user', content: prompt }], chunk => { raw += chunk })
+      await callParse([{ role: 'user', content: prompt }], chunk => { raw += chunk })
       const jsonMatch = raw.match(/```json\s*([\s\S]+?)\s*```/) ?? raw.match(/(\{[\s\S]+\})/)
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[1]) as Partial<MasterProfile>
@@ -102,7 +105,7 @@ export default function ProfileTab() {
     try {
       const prompt = buildResumeParsePrompt(resumeText)
       let raw = ''
-      await callHaiku([{ role: 'user', content: prompt }], (chunk) => { raw += chunk })
+      await callParse([{ role: 'user', content: prompt }], (chunk) => { raw += chunk })
       const jsonMatch = raw.match(/```json\s*([\s\S]+?)\s*```/) ?? raw.match(/(\{[\s\S]+\})/)
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[1]) as Partial<MasterProfile>
@@ -116,6 +119,20 @@ export default function ProfileTab() {
       console.error('[Smart Apply] Resume parse failed:', e)
     } finally {
       setParsing(false)
+    }
+  }
+
+  async function handleFillForm() {
+    setFilling(true)
+    setFillMsg('')
+    try {
+      const outcome = await fillFormOnPage()
+      setFillMsg(outcome.message)
+    } catch (e) {
+      console.error('[Smart Apply] Form fill failed:', e)
+      setFillMsg('Form fill failed — see console')
+    } finally {
+      setFilling(false)
     }
   }
 
@@ -166,7 +183,7 @@ export default function ProfileTab() {
     try {
       const prompt = buildProjectExtractPrompt(projectBlurb)
       let raw = ''
-      await callHaiku([{ role: 'user', content: prompt }], (chunk) => { raw += chunk })
+      await callParse([{ role: 'user', content: prompt }], (chunk) => { raw += chunk })
       const jsonMatch = raw.match(/```json\s*([\s\S]+?)\s*```/) ?? raw.match(/(\{[\s\S]+\})/)
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[1]) as Partial<Project>
@@ -239,6 +256,25 @@ export default function ProfileTab() {
   return (
     <div className="h-full overflow-y-auto">
       <div className="p-4 space-y-4">
+
+        {/* Fill form on current page */}
+        <div>
+          <button
+            onClick={handleFillForm}
+            disabled={filling || !hasProfile}
+            className="btn-primary w-full flex items-center justify-center gap-2"
+            title={hasProfile ? 'Fill the form on the current page with your profile data' : 'Add profile data first'}
+          >
+            {filling && <Spinner className="w-3 h-3" />}
+            {filling ? 'Filling form...' : 'Fill form on this page'}
+          </button>
+          {fillMsg && (
+            <p className="text-[11px] text-center mt-1.5 text-indigo-500 dark:text-indigo-300">
+              {fillMsg}
+              <button onClick={() => setFillMsg('')} className="ml-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">✕</button>
+            </p>
+          )}
+        </div>
 
         {/* Import Actions */}
         {showImport ? (

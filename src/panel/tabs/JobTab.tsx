@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { ScrapedJob, FitAnalysis, GeneratedDocuments } from '../../types'
-import { callHaiku, callSmall, callSonnet, buildFitPrompt, buildDocsPrompt, buildSignalExtractionPrompt, buildJobParsePrompt, parseDocsResponse, type DocMode } from '../lib/claude'
+import { callParse, callFit, callWrite, buildFitPrompt, buildDocsPrompt, buildSignalExtractionPrompt, buildJobParsePrompt, parseDocsResponse, type DocMode } from '../lib/claude'
 import { getAutoAnalyze } from './SettingsTab'
-import { loadProfile } from '../lib/storage'
+import { loadProfile, loadDocPrefs, saveDocPrefs, type DocPreferences } from '../lib/storage'
 import ErrorBanner from '../components/ErrorBanner'
 import Spinner from '../components/Spinner'
 
@@ -29,6 +29,27 @@ export default function JobTab({ job, fit, onJobScraped, onFitAnalyzed, onGenera
   const [docMode, setDocMode] = useState<DocMode>('both')
   const [error, setError] = useState('')
   const [showTip, setShowTip] = useState(() => localStorage.getItem(SCRAPE_TIP_KEY) !== 'true')
+  const [prefs, setPrefs] = useState<DocPreferences>({ cv: '', coverLetter: '' })
+  const [prefsDirty, setPrefsDirty] = useState(false)
+  const [prefsSaved, setPrefsSaved] = useState(false)
+  const [prefsOpen, setPrefsOpen] = useState(false)
+
+  useEffect(() => {
+    loadDocPrefs().then(setPrefs)
+  }, [])
+
+  function updatePrefs(patch: Partial<DocPreferences>) {
+    setPrefs(prev => ({ ...prev, ...patch }))
+    setPrefsDirty(true)
+    setPrefsSaved(false)
+  }
+
+  async function handleSavePrefs() {
+    await saveDocPrefs(prefs)
+    setPrefsDirty(false)
+    setPrefsSaved(true)
+    setTimeout(() => setPrefsSaved(false), 2000)
+  }
 
   function dismissTip() {
     localStorage.setItem(SCRAPE_TIP_KEY, 'true')
@@ -51,7 +72,7 @@ export default function JobTab({ job, fit, onJobScraped, onFitAnalyzed, onGenera
       if (_rawText) {
         const prompt = buildJobParsePrompt(_rawText, job.url)
         let raw = ''
-        await callHaiku([{ role: 'user', content: prompt }], chunk => { raw += chunk })
+        await callParse([{ role: 'user', content: prompt }], chunk => { raw += chunk })
         try {
           const jsonMatch = raw.match(/```json\s*([\s\S]+?)\s*```/) ?? raw.match(/(\{[\s\S]+\})/)
           if (jsonMatch) {
@@ -73,7 +94,7 @@ export default function JobTab({ job, fit, onJobScraped, onFitAnalyzed, onGenera
           const profile = await loadProfile()
           const fitPrompt = buildFitPrompt(job, profile)
           let fitRaw = ''
-          await callHaiku([{ role: 'user', content: fitPrompt }], chunk => { fitRaw += chunk })
+          await callFit([{ role: 'user', content: fitPrompt }], chunk => { fitRaw += chunk })
           onFitAnalyzed(parseFitResponse(fitRaw))
         } catch { /* fit failure doesn't block the scrape result */ }
         finally { setAnalyzing(false) }
@@ -108,7 +129,7 @@ export default function JobTab({ job, fit, onJobScraped, onFitAnalyzed, onGenera
       const profile = await loadProfile()
       const prompt = buildFitPrompt(job, profile)
       let raw = ''
-      await callHaiku([{ role: 'user', content: prompt }], (chunk) => { raw += chunk })
+      await callFit([{ role: 'user', content: prompt }], (chunk) => { raw += chunk })
       const fit = parseFitResponse(raw)
       onFitAnalyzed(fit)
     } catch (e) {
@@ -129,7 +150,7 @@ export default function JobTab({ job, fit, onJobScraped, onFitAnalyzed, onGenera
       // Stage 1: extract signals from JD + profile
       setGeneratingStatus('Analysing role signals…')
       let signalsRaw = ''
-      await callSmall([{ role: 'user', content: buildSignalExtractionPrompt(job, profile) }], chunk => { signalsRaw += chunk })
+      await callFit([{ role: 'user', content: buildSignalExtractionPrompt(job, profile) }], chunk => { signalsRaw += chunk })
 
       let signalsContext = ''
       try {
@@ -157,9 +178,9 @@ export default function JobTab({ job, fit, onJobScraped, onFitAnalyzed, onGenera
         customContext ? `Additional context: ${customContext}` : '',
       ].filter(Boolean).join('\n')
 
-      const prompt = buildDocsPrompt(job, profile, userContext, docMode)
+      const prompt = buildDocsPrompt(job, profile, userContext, docMode, await loadDocPrefs())
       let raw = ''
-      await callSonnet([{ role: 'user', content: prompt }], (chunk) => {
+      await callWrite([{ role: 'user', content: prompt }], (chunk) => {
         raw += chunk
         onGenerateDocs(parseDocsResponse(raw, docMode))
       })
@@ -269,6 +290,48 @@ export default function JobTab({ job, fit, onJobScraped, onFitAnalyzed, onGenera
             </button>
           </Section>
         )}
+
+        {/* Long-term CV / CL preferences — global, applied to every generation */}
+        <Section title="CV & Cover Letter Preferences">
+          <button
+            onClick={() => setPrefsOpen(o => !o)}
+            className="w-full text-left text-xs text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+          >
+            {prefsOpen ? '▾' : '▸'} Standing rules applied to every CV / cover letter
+            {!prefsOpen && (prefs.cv.trim() || prefs.coverLetter.trim()) && (
+              <span className="ml-1.5 text-[9px] bg-indigo-500/20 text-indigo-500 dark:text-indigo-300 rounded-full px-1.5 py-0.5">active</span>
+            )}
+          </button>
+          {prefsOpen && (
+            <div className="mt-3 space-y-3">
+              <div>
+                <p className="text-xs text-slate-400 mb-1">CV preferences</p>
+                <textarea
+                  value={prefs.cv}
+                  onChange={e => updatePrefs({ cv: e.target.value })}
+                  placeholder="e.g. always one page, British spelling, skills section above experience, never mention hospitality roles..."
+                  className="input-base h-20 resize-y w-full text-xs"
+                />
+              </div>
+              <div>
+                <p className="text-xs text-slate-400 mb-1">Cover letter preferences</p>
+                <textarea
+                  value={prefs.coverLetter}
+                  onChange={e => updatePrefs({ coverLetter: e.target.value })}
+                  placeholder="e.g. max 250 words, mention dual UK-US citizenship when role is US-based, sign off with 'Kind regards'..."
+                  className="input-base h-20 resize-y w-full text-xs"
+                />
+              </div>
+              <button
+                onClick={handleSavePrefs}
+                disabled={!prefsDirty}
+                className="btn-secondary w-full text-xs"
+              >
+                {prefsSaved ? '✓ Saved' : 'Save preferences'}
+              </button>
+            </div>
+          )}
+        </Section>
 
         {/* Form Fields */}
         {job && (

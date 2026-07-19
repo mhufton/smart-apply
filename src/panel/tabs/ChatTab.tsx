@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import type { ChatMessage, GeneratedDocuments, ScrapedJob } from '../../types'
-import { callHaiku } from '../lib/claude'
+import { callWrite, serializeProfile } from '../lib/claude'
+import { loadDocPrefs, loadProfile } from '../lib/storage'
 import ErrorBanner from '../components/ErrorBanner'
 import Spinner from '../components/Spinner'
 
@@ -52,6 +53,11 @@ export default function ChatTab({ messages, docs, job, onMessagesChange, onDocsU
         'You are a job application writing assistant. Be concise and direct.',
       ]
 
+      const profile = await loadProfile()
+      if (profile.basics.name || profile.experiences?.length) {
+        systemParts.push(`\n## Candidate Profile (the user — source of truth for their real experience)\n${serializeProfile(profile)}`)
+      }
+
       if (job) {
         systemParts.push(`\n## Current Job\nTitle: ${job.title}\nCompany: ${job.company}\nDescription:\n${job.description.slice(0, 2000)}`)
       }
@@ -59,6 +65,15 @@ export default function ChatTab({ messages, docs, job, onMessagesChange, onDocsU
       if (docs) {
         systemParts.push(`\n## Current CV\n${docs.cv}`)
         systemParts.push(`\n## Current Cover Letter\n${docs.coverLetter}`)
+      }
+
+      const prefs = await loadDocPrefs()
+      if (prefs.cv.trim() || prefs.coverLetter.trim()) {
+        systemParts.push(
+          `\n## Standing Preferences (user's long-term rules — always respect when editing)`,
+          prefs.cv.trim() ? `CV: ${prefs.cv.trim()}` : '',
+          prefs.coverLetter.trim() ? `Cover letter: ${prefs.coverLetter.trim()}` : '',
+        )
       }
 
       systemParts.push(
@@ -76,7 +91,7 @@ export default function ChatTab({ messages, docs, job, onMessagesChange, onDocsU
       ]
 
       let fullResponse = ''
-      await callHaiku(apiMessages, (chunk) => {
+      await callWrite(apiMessages, (chunk) => {
         fullResponse += chunk
         onMessagesChange(
           newMessages.map(m =>
